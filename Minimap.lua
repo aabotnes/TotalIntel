@@ -28,7 +28,7 @@ local function ShowTooltip(self)
         if (m.k or 0) > 0 then mobs = mobs + 1; kills = kills + m.k end
     end
     GameTooltip:AddLine(("Your bestiary: %s, %s"):format(SB.Plural(mobs, "mob"), SB.Plural(kills, "kill")), 0.53, 0.8, 1)
-    if not SB.db.learn then GameTooltip:AddLine("Recording is off (/sb learn)", 1, 0.3, 0.3) end
+    if not SB.db.learn then GameTooltip:AddLine("Recording is off (/tits learn)", 1, 0.3, 0.3) end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Left-click: open (on your target)", 0.6, 0.6, 0.6)
     GameTooltip:AddLine("Right-click: settings", 0.6, 0.6, 0.6)
@@ -38,7 +38,7 @@ end
 
 local function Create()
     if btn or not Minimap then return end
-    btn = CreateFrame("Button", "SuperBestiaryMinimapButton", Minimap)
+    btn = CreateFrame("Button", "TotalIntelMinimapButton", Minimap)
     btn:SetSize(31, 31)
     btn:SetFrameStrata("MEDIUM")
     btn:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 8)

@@ -1,4 +1,4 @@
--- The Super Bestiary window: a list of mobs on the left (recent targets, your zone or instance,
+-- The Total Intel window: a list of mobs on the left (recent targets, your zone or instance,
 -- your bestiary, or search results) and a page for the selected mob or item on the right.
 
 local _, SB = ...
@@ -681,7 +681,7 @@ end
 
 local function CreateUI()
     local tpl
-    ui, tpl = W.CreateWithTemplate("Frame", "SuperBestiaryFrame", UIParent,
+    ui, tpl = W.CreateWithTemplate("Frame", "TotalIntelFrame", UIParent,
         { "PortraitFrameTemplate", "ButtonFrameTemplate", "BasicFrameTemplateWithInset" })
     ui:SetSize(WIDTH, HEIGHT)
     ui:SetPoint("CENTER")
@@ -695,7 +695,7 @@ local function CreateUI()
     ui:SetScript("OnDragStart", ui.StartMoving)
     ui:SetScript("OnDragStop", ui.StopMovingOrSizing)
     ui:Hide()
-    tinsert(UISpecialFrames, "SuperBestiaryFrame")
+    tinsert(UISpecialFrames, "TotalIntelFrame")
 
     local top = -30
     if tpl == "PortraitFrameTemplate" or tpl == "ButtonFrameTemplate" then
@@ -883,7 +883,7 @@ local function CreateUI()
     local nlabel = Text(notes, "GameFontNormal")
     nlabel:SetPoint("TOPLEFT", 10, -10)
     nlabel:SetText("Your notes on this mob (saved for all your characters)")
-    local scroll = W.CreateWithTemplate("ScrollFrame", "SuperBestiaryNotesScroll", notes, { "UIPanelScrollFrameTemplate", "ScrollFrameTemplate" })
+    local scroll = W.CreateWithTemplate("ScrollFrame", "TotalIntelNotesScroll", notes, { "UIPanelScrollFrameTemplate", "ScrollFrameTemplate" })
     scroll:SetPoint("TOPLEFT", 10, -34)
     scroll:SetPoint("BOTTOMRIGHT", -30, 10)
     local eb = CreateFrame("EditBox", nil, scroll)

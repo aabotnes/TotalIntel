@@ -1,6 +1,6 @@
 -- The "bestiary" part: what you've seen yourself. Kills, corpses looted, the items you got (so
 -- you have your own Forever drop rates next to the Classic numbers), skinning/pickpocket loot,
--- and spells you've seen each mob cast. Saved account-wide in SuperBestiaryDB.mobs.
+-- and spells you've seen each mob cast. Saved account-wide in TotalIntelDB.mobs.
 
 local _, SB = ...
 local Public, NpcIdFromGUID = SB.Public, SB.NpcIdFromGUID

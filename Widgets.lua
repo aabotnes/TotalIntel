@@ -377,7 +377,7 @@ end
 local popup
 function SB.ShowLink(kind, id, label)
     if not popup then
-        popup = W.CreateWithTemplate("Frame", "SuperBestiaryLinkFrame", UIParent, { "BasicFrameTemplateWithInset", "ButtonFrameTemplate" })
+        popup = W.CreateWithTemplate("Frame", "TotalIntelLinkFrame", UIParent, { "BasicFrameTemplateWithInset", "ButtonFrameTemplate" })
         popup:SetSize(460, 110)
         W.FixCloseButton(popup)
         popup:SetPoint("CENTER", 0, 120)
@@ -387,7 +387,7 @@ function SB.ShowLink(kind, id, label)
         popup:RegisterForDrag("LeftButton")
         popup:SetScript("OnDragStart", popup.StartMoving)
         popup:SetScript("OnDragStop", popup.StopMovingOrSizing)
-        tinsert(UISpecialFrames, "SuperBestiaryLinkFrame")
+        tinsert(UISpecialFrames, "TotalIntelLinkFrame")
         popup.title = W.Text(popup, "GameFontHighlight")
         popup.title:SetPoint("TOP", 0, -6)
         popup.hint = W.Text(popup, "GameFontNormalSmall")

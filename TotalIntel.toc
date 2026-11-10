@@ -1,10 +1,10 @@
 ## Interface: 16001
-## Title: Super Bestiary
-## Notes: |cffc27dff[Soeta's]|r Loot tables, drop chances, abilities and quest info for every mob, on tooltips and in a bestiary window. /sb
+## Title: Total Intel on Targets & Spoils (TITS)
+## Notes: |cffc27dff[Soeta's]|r Loot tables, drop chances, abilities and quest info for every mob, on tooltips and in a window. /tits
 ## Author: Soeta
 ## Version: 1.0.0
 ## IconTexture: Interface\Icons\Ability_Physical_Taunt
-## SavedVariables: SuperBestiaryDB
+## SavedVariables: TotalIntelDB
 ## X-License: GPL-3.0
 
 Core.lua

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds Super Bestiary's bundled database (Data/*.lua).
+"""Builds Total Intel's bundled database (Data/*.lua).
 
 Sources (all GPL-3.0, parsed as data, never executed):
   * QuestieDB       https://github.com/Questie/QuestieDB        - WoW: Forever NPCs, items, quests, zones

@@ -1,6 +1,6 @@
-# Super Bestiary
+# Total Intel on Targets & Spoils
 
-*by Soeta*
+*by Soeta* · `/tits`
 
 Wowhead in your game. Hover a mob to see its best drops with their drop chance, its abilities, and the quests you need it for, with your progress. Open the bestiary window for its full loot table, abilities, quests, where it spawns, and everything you've killed, looted and seen it cast yourself. It's made for WoW: Forever (interface 16001).
 
@@ -8,7 +8,7 @@ The game doesn't let addons go online, so the database ships inside the addon (a
 
 ## Install
 
-Download the addon and unzip it into `Interface\AddOns`. You should end up with `Interface\AddOns\SuperBestiary\SuperBestiary.toc`. The folder must be named exactly `SuperBestiary`. Restart the game and make sure **Super Bestiary** is ticked in the AddOns list.
+Download the addon and unzip it into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`. The folder must be named exactly `TotalIntel`. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
 
 ## Tooltips
 
@@ -25,9 +25,9 @@ Hover an item to see the quests that need it (with progress), the quest it start
 
 Every line can be turned on or off. You can also show the lines only while Shift, Ctrl or Alt is held. See [Settings](#settings).
 
-## The bestiary window (`/sb`)
+## The window (`/tits`)
 
-`/sb` opens the window on your target. On the left:
+`/tits` opens the window on your target. On the left:
 
 - **Recent**: mobs you've targeted lately.
 - **Zone**: every mob in your zone, with bosses first. Inside a dungeon or raid, it lists that instance's mobs and bosses.
@@ -52,10 +52,10 @@ Click an item or mob anywhere in the window to open its page, and **< Back** to 
 
 ## Settings
 
-Open the settings with `/sb options`, the **Settings** button in the window, right-click on the minimap button, or the game's **Options → AddOns → Super Bestiary**.
+Open the settings with `/tits options`, the **Settings** button in the window, right-click on the minimap button, or the game's **Options → AddOns → Total Intel on Targets & Spoils**.
 
 **Mob tooltips**
-- Add Super Bestiary lines to tooltips, either always or only while Shift, Ctrl or Alt is held
+- Add Total Intel lines to tooltips, either always or only while Shift, Ctrl or Alt is held
 - Type, rank and skinning
 - Your quests that need it
 - Quests it gives and turn-ins
@@ -78,25 +78,25 @@ Open the settings with `/sb options`, the **Settings** button in the window, rig
 
 | Command | What it does |
 |---|---|
-| `/sb` | open the window on your target |
-| `/sb <name>` | search mobs and items, e.g. `/sb hogger`. A single match opens straight away. |
-| `/sb zone` | mobs in your zone or instance |
-| `/sb options` | settings |
-| `/sb link` | Wowhead link for your target |
-| `/sb learn` | turn recording kills, loot and spells on or off |
-| `/sb minimap` | hide or show the minimap button |
+| `/tits` | open the window on your target |
+| `/tits <name>` | search mobs and items, e.g. `/tits hogger`. A single match opens straight away. |
+| `/tits zone` | mobs in your zone or instance |
+| `/tits options` | settings |
+| `/tits link` | Wowhead link for your target |
+| `/tits learn` | turn recording kills, loot and spells on or off |
+| `/tits minimap` | hide or show the minimap button |
 
-`/bestiary` works too. Under **Key Bindings → AddOns** you can bind *Open for target*, *Open for mouseover* and *Toggle window*.
+`/totalintel` works too. Under **Key Bindings → AddOns** you can bind *Open for target*, *Open for mouseover* and *Toggle window*.
 
 ## Good to know
 
 - **Drop chances are Classic numbers.** They come from the CMaNGOS Classic database, because Forever doesn't have published drop rates yet. Forever's own data decides *which* mobs drop *which* items. If Forever lists a drop that Classic doesn't have, it's marked *Forever*, with no chance. That's why the window shows your own rate next to every chance.
 - **Dungeons and raids:** inside instances, Forever hides from addons which mob a tooltip belongs to. Mob tooltips there have no extra lines, and the game won't tell the addon who your target is. Use the **Zone** list instead: it lists the instance's bosses and mobs. Open-world mobs work normally, even in combat.
-- **What it records:** kills (yours and your group's), every corpse you loot and what was on it, skinning, mining and herbing loot, pickpocketing (while stealthed), and spells mobs cast near you. It's saved for your whole account. Turn it off with `/sb learn`.
+- **What it records:** kills (yours and your group's), every corpse you loot and what was on it, skinning, mining and herbing loot, pickpocketing (while stealthed), and spells mobs cast near you. It's saved for your whole account. Turn it off with `/tits learn`.
 - **New in Forever:** a mob or quest that isn't in the database still gets a page, and still records your kills, loot and spells. Quests not in the database are still matched to mobs by name.
 
 ## Data and license
 
-Super Bestiary is GPL-3.0. Its database is built from [QuestieDB](https://github.com/Questie/QuestieDB) (WoW: Forever NPCs, quests, items and zones) and [CMaNGOS](https://github.com/cmangos) (drop chances, stats, spell lists and boss scripts), both GPL-3.0. Thanks to both projects. See [tools/README.md](tools/README.md) to rebuild it.
+Total Intel is GPL-3.0. Its database is built from [QuestieDB](https://github.com/Questie/QuestieDB) (WoW: Forever NPCs, quests, items and zones) and [CMaNGOS](https://github.com/cmangos) (drop chances, stats, spell lists and boss scripts), both GPL-3.0. Thanks to both projects. See [tools/README.md](tools/README.md) to rebuild it.
 
-Super Bestiary is not affiliated with Wowhead or Blizzard.
+Total Intel is not affiliated with Wowhead or Blizzard.

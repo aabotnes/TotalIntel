@@ -1,14 +1,14 @@
--- Super Bestiary core: namespace, settings, events, slash commands and helpers.
+-- Total Intel core: namespace, settings, events, slash commands and helpers.
 --
 -- WoW: Forever runs on a modern client that hides some values from addons ("secret values"),
 -- mainly inside dungeons/raids and on world objects in combat. Every value that comes from the
 -- game about a unit goes through SB.Public() before the addon compares, parses or stores it.
 
 local ADDON_NAME, SB = ...
-_G.SuperBestiary = SB
+_G.TotalIntel = SB
 SB.name = ADDON_NAME
 SB.D = SB.D or {}   -- bundled database (Data/*.lua)
-SB.TITLE = "|cffc27dff[Soeta's]|r |cffff9933Super Bestiary|r"
+SB.TITLE = "|cffc27dff[Soeta's]|r |cffff9933Total Intel on Targets & Spoils|r"
 SB.ICON = "Interface\\Icons\\Ability_Physical_Taunt" -- Beast Lore
 
 SB.DEFAULTS = {
@@ -188,8 +188,8 @@ end)
 
 SB.On("ADDON_LOADED", function(name)
     if name ~= ADDON_NAME then return end
-    SuperBestiaryDB = SuperBestiaryDB or {}
-    SB.db = SuperBestiaryDB
+    TotalIntelDB = TotalIntelDB or {}
+    SB.db = TotalIntelDB
     Merge(SB.db, SB.DEFAULTS)
     SB.db.version = 1
     if SB.OnLoad then for _, fn in ipairs(SB.OnLoad) do fn() end end
@@ -205,13 +205,13 @@ end
 ------------------------------------------------------------------------------
 
 local HELP = {
-    "|cffffd100/sb|r - open the window on your target (or the last mob you viewed)",
-    "|cffffd100/sb <name>|r - search mobs and items, e.g. |cffffd100/sb hogger|r",
-    "|cffffd100/sb zone|r - mobs in your zone or instance",
-    "|cffffd100/sb options|r - tooltip and window settings",
-    "|cffffd100/sb link|r - Wowhead link for your target",
-    "|cffffd100/sb minimap|r - hide or show the minimap button",
-    "|cffffd100/sb learn|r - turn recording kills, loot and spells on or off",
+    "|cffffd100/tits|r - open the window on your target (or the last mob you viewed)",
+    "|cffffd100/tits <name>|r - search mobs and items, e.g. |cffffd100/tits hogger|r",
+    "|cffffd100/tits zone|r - mobs in your zone or instance",
+    "|cffffd100/tits options|r - tooltip and window settings",
+    "|cffffd100/tits link|r - Wowhead link for your target",
+    "|cffffd100/tits minimap|r - hide or show the minimap button",
+    "|cffffd100/tits learn|r - turn recording kills, loot and spells on or off",
 }
 
 local function Slash(msg)
@@ -245,16 +245,15 @@ local function Slash(msg)
     end
 end
 
-SLASH_SUPERBESTIARY1 = "/sb"
-SLASH_SUPERBESTIARY2 = "/bestiary"
-SLASH_SUPERBESTIARY3 = "/superbestiary"
-SlashCmdList.SUPERBESTIARY = Slash
+SLASH_TOTALINTEL1 = "/tits"
+SLASH_TOTALINTEL2 = "/totalintel"
+SlashCmdList.TOTALINTEL = Slash
 
 -- Key bindings (Bindings.xml)
-BINDING_HEADER_SUPERBESTIARY = "Super Bestiary"
-BINDING_NAME_SUPERBESTIARY_TARGET = "Open for target"
-BINDING_NAME_SUPERBESTIARY_MOUSEOVER = "Open for mouseover"
-BINDING_NAME_SUPERBESTIARY_TOGGLE = "Toggle window"
+BINDING_HEADER_TOTALINTEL = "Total Intel"
+BINDING_NAME_TOTALINTEL_TARGET = "Open for target"
+BINDING_NAME_TOTALINTEL_MOUSEOVER = "Open for mouseover"
+BINDING_NAME_TOTALINTEL_TOGGLE = "Toggle window"
 
 function SB.BindingTarget() SB.OpenTarget() end
 function SB.BindingMouseover()

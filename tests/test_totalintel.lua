@@ -1,5 +1,5 @@
--- Super Bestiary against a mocked WoW: Forever client.
--- usage: lua5.1 tests/test_bestiary.lua .
+-- Total Intel against a mocked WoW: Forever client.
+-- usage: lua5.1 tests/test_totalintel.lua .
 package.path = arg[0]:gsub("[^/]+$", "") .. "?.lua;" .. package.path
 local M = require("wow_mock")
 local check, Has = M.check, M.Has
@@ -136,7 +136,7 @@ check(Has(lines, "You looted 1 from Hogger"), "item tooltip: where you looted it
 ------------------------------------------------------------------------------
 SB.OpenTarget()
 local page = SB.CurrentPage()
-check(SB.IsOpen() and page.kind == "npc" and page.id == HOGGER, "/sb opens the window on your target")
+check(SB.IsOpen() and page.kind == "npc" and page.id == HOGGER, "/tits opens the window on your target")
 local rows = SB.ContentRows()
 local function RowsHave(pattern, field)
     for _, row in ipairs(SB.ContentRows()) do
@@ -173,9 +173,9 @@ SB.Back()
 check(SB.CurrentPage().id == HOGGER, "Back returns to Hogger")
 
 -- search through the slash command
-SlashCmdList.SUPERBESTIARY("bonereaver")
+SlashCmdList.TOTALINTEL("bonereaver")
 page = SB.CurrentPage()
-check(page.kind == "item" and page.id == 17076, "/sb bonereaver opens the only match")
+check(page.kind == "item" and page.id == 17076, "/tits bonereaver opens the only match")
 
 -- zone list
 SB.OpenZone()
@@ -202,7 +202,7 @@ check(SB.CurrentPage().id == 2589, "alt-click on an item opens its page")
 SB.OpenSettings()
 check(true, "settings page opens")
 SB.ShowLink("npc", HOGGER, "Hogger")
-check(SuperBestiaryLinkFrame and SuperBestiaryLinkFrame.edit:GetText() == "https://www.wowhead.com/forever/npc=448", "Wowhead link popup")
+check(TotalIntelLinkFrame and TotalIntelLinkFrame.edit:GetText() == "https://www.wowhead.com/forever/npc=448", "Wowhead link popup")
 SB.db.wowhead = "classic"
 check(SB.WowheadURL("item", 17076) == "https://www.wowhead.com/classic/item=17076", "Wowhead site setting")
 
@@ -211,4 +211,4 @@ SB.OpenNpc(999999)
 check(SB.CurrentPage().id == 999999, "unknown NPC page doesn't error")
 
 M.Advance(5)
-print("ALL BESTIARY TESTS PASSED")
+print("ALL TESTS PASSED")

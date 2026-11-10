@@ -2,7 +2,7 @@
 --
 -- On WoW: Forever, tooltips inside dungeons and raids carry secret data (the game hides which
 -- mob it is from addons), so mob tooltips there stay as they are. Open-world mobs are readable,
--- even in combat. Use /sb zone inside an instance to browse its mobs and bosses instead.
+-- even in combat. Use /tits zone inside an instance to browse its mobs and bosses instead.
 
 local _, SB = ...
 local Public = SB.Public
@@ -168,7 +168,7 @@ function SB.AddNpcLines(tt, id, unit)
     end
 
     if shown and o.hint then
-        Add(tt, "/sb or the keybind for the full bestiary page", { 0.45, 0.45, 0.45 })
+        Add(tt, "/tits or the keybind for the full bestiary page", { 0.45, 0.45, 0.45 })
     end
 end
 

@@ -4,7 +4,7 @@
 
 ## Sources
 
-All three are GPL-3.0, which is why Super Bestiary is GPL-3.0 too. The generator reads them as plain data and never runs their code.
+All three are GPL-3.0, which is why Total Intel is GPL-3.0 too. The generator reads them as plain data and never runs their code.
 
 | Source | Used for |
 |---|---|

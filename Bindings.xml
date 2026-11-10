@@ -1,11 +1,11 @@
 <Bindings>
-    <Binding name="SUPERBESTIARY_TARGET" header="SUPERBESTIARY" category="ADDONS">
-        SuperBestiary.BindingTarget()
+    <Binding name="TOTALINTEL_TARGET" header="TOTALINTEL" category="ADDONS">
+        TotalIntel.BindingTarget()
     </Binding>
-    <Binding name="SUPERBESTIARY_MOUSEOVER" category="ADDONS">
-        SuperBestiary.BindingMouseover()
+    <Binding name="TOTALINTEL_MOUSEOVER" category="ADDONS">
+        TotalIntel.BindingMouseover()
     </Binding>
-    <Binding name="SUPERBESTIARY_TOGGLE" category="ADDONS">
-        SuperBestiary.BindingToggle()
+    <Binding name="TOTALINTEL_TOGGLE" category="ADDONS">
+        TotalIntel.BindingToggle()
     </Binding>
 </Bindings>

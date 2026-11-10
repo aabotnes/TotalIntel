@@ -1,4 +1,4 @@
--- Minimal WoW client mock for Super Bestiary's headless tests.
+-- Minimal WoW client mock for Total Intel's headless tests.
 local M = { log = {}, now = 0, timers = {}, frames = {}, units = {}, quests = {}, loot = {}, secret = {} }
 
 local NoOp = setmetatable({}, {})
@@ -173,16 +173,16 @@ function M.Load(dir, files)
     local SB = {}
     for _, f in ipairs(files) do
         local chunk = assert(loadfile(dir .. "/" .. f))
-        chunk("SuperBestiary", SB)
+        chunk("TotalIntel", SB)
     end
-    M.Fire("ADDON_LOADED", "SuperBestiary")
+    M.Fire("ADDON_LOADED", "TotalIntel")
     M.Fire("PLAYER_LOGIN")
     return SB
 end
 
 function M.TocFiles(dir)
     local files = {}
-    for line in io.lines(dir .. "/SuperBestiary.toc") do
+    for line in io.lines(dir .. "/TotalIntel.toc") do
         if line:match("%.lua%s*$") and not line:match("^#") then files[#files + 1] = (line:gsub("\\", "/"):gsub("%s+$", "")) end
     end
     return files
