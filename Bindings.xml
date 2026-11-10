@@ -1,0 +1,11 @@
+<Bindings>
+    <Binding name="SUPERBESTIARY_TARGET" header="SUPERBESTIARY" category="ADDONS">
+        SuperBestiary.BindingTarget()
+    </Binding>
+    <Binding name="SUPERBESTIARY_MOUSEOVER" category="ADDONS">
+        SuperBestiary.BindingMouseover()
+    </Binding>
+    <Binding name="SUPERBESTIARY_TOGGLE" category="ADDONS">
+        SuperBestiary.BindingToggle()
+    </Binding>
+</Bindings>

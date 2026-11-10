@@ -1,0 +1,27 @@
+## Interface: 16001
+## Title: Super Bestiary
+## Notes: |cffc27dff[Soeta's]|r Loot tables, drop chances, abilities and quest info for every mob, on tooltips and in a bestiary window. /sb
+## Author: Soeta
+## Version: 1.0.0
+## IconTexture: Interface\Icons\Ability_Physical_Taunt
+## SavedVariables: SuperBestiaryDB
+## X-License: GPL-3.0
+
+Core.lua
+Data\Npcs.lua
+Data\Loot.lua
+Data\LootExtra.lua
+Data\Spells.lua
+Data\Items.lua
+Data\DroppedBy.lua
+Data\ItemQuests.lua
+Data\Quests.lua
+Data\Zones.lua
+Database.lua
+Quests.lua
+Tracker.lua
+Tooltip.lua
+Widgets.lua
+Settings.lua
+UI.lua
+Minimap.lua
