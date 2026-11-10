@@ -1,6 +1,9 @@
-# Rebuilding the Classic reference numbers
+# Rebuilding the bundled data
 
-Total Intel reads everything about WoW: Forever live in the game, from QuestieDB and the client (see the main README). Only Classic reference numbers that no live source has are bundled in `Data/*.lua`:
+`Data/*.lua` is generated. Don't edit it by hand: change `build_data.py` and run it again. There are two sets:
+
+- **Forever snapshot** (`Forever*.lua`): QuestieDB's WoW: Forever NPCs, quests, items, zones and Wowhead quest-drop rates. The addon uses it only when no live Questie database is installed in the game. Rebuild it to pick up new Forever content.
+- **Classic reference numbers** (the other files): what no live source has.
 
 | File | Contents |
 |---|---|
@@ -9,13 +12,15 @@ Total Intel reads everything about WoW: Forever live in the game, from QuestieDB
 | `LootExtra.lua` | skinning and pickpocket loot |
 | `Spells.lua` | spells each NPC casts (spell lists, EventAI and boss scripts) |
 | `Trainers.lua`, `TrainerTemplates.lua` | what each trainer teaches: spell, cost, level and skill (the fallback until you visit the trainer in the game) |
-
-They're generated: don't edit them by hand. Change `build_data.py` and run it again.
+| `ForeverNpcs.lua`, `ForeverItems.lua`, `ForeverQuests.lua` | the Forever snapshot: names, levels, spawn zones with a central point, quest links, drops, vendors |
+| `ForeverRates.lua` | Wowhead drop rates for quest items |
+| `ForeverZones.lua` | zone names, map IDs, dungeons, and the QuestieDB commit and date the snapshot was built from |
 
 ## Sources
 
-Both are GPL-3.0, which is why Total Intel is GPL-3.0 too. The generator reads them as plain data and never runs their code.
+All are GPL-3.0, which is why Total Intel is GPL-3.0 too. The generator reads them as plain data and never runs their code.
 
+- [Questie/QuestieDB](https://github.com/Questie/QuestieDB) (`data/Forever`, `support/Forever`): the Forever snapshot
 - [cmangos/classic-db](https://github.com/cmangos/classic-db) (`Full_DB/*.sql.gz`): loot tables, creature templates, spell lists, EventAI, boss encounters
 - [cmangos/mangos-classic](https://github.com/cmangos/mangos-classic) (`src/game/AI/ScriptDevAI/scripts`), optional: boss abilities from the spells each boss script casts
 
@@ -28,7 +33,9 @@ zcat classic-db/Full_DB/*.sql.gz > full.sql
 git clone --depth 1 --filter=blob:none --sparse https://github.com/cmangos/mangos-classic
 (cd mangos-classic && git sparse-checkout set src/game/AI/ScriptDevAI/scripts)
 
-python3 -I tools/build_data.py --cmangos-sql full.sql --scripts mangos-classic
+git clone --depth 1 https://github.com/Questie/QuestieDB
+
+python3 -I tools/build_data.py --cmangos-sql full.sql --scripts mangos-classic --questiedb QuestieDB
 ```
 
-It takes about 10 seconds and prints row counts and file sizes.
+It takes about 15 seconds and prints row counts and file sizes. Leave out `--questiedb` to rebuild only the Classic numbers.

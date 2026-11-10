@@ -292,7 +292,6 @@ end
 local B = {}
 
 local BODY = W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight"))
-local BODY_SMALL = W.Font("GameFontBlack", "GameFontHighlightSmall")
 
 -- A clickable row on a dark bar that fills its whole width.
 local function BarRow(parent, height)
@@ -396,14 +395,13 @@ local function SetIconRow(b, r, width, round)
         end
     end
     b.name:SetText(r.text or "")
-    TextColor(b.name, r.color, "light")
+    TextColor(b.name, r.color, r.faded and "lootSub" or "light")
     b.sub:SetText(r.sub or "")
     Skin.Color(b.sub, "lootSub")
     b.mid:SetText(r.mid or "")
     Skin.Color(b.mid, "lootMid")
     b.right:SetText(r.right or "")
     TextColor(b.right, r.rightColor, "you")
-    b:SetAlpha(r.faded and 0.6 or 1)
     return 40, 0
 end
 
@@ -463,55 +461,59 @@ B.header = {
 }
 B.spell = { new = B.header.new, set = B.header.set, gap = 3 }
 
--- Plain text on the parchment.
+-- Notes and descriptions: ink on a light paper backing.
 B.text = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
+        f.bg = Skin.Paper(f)
+        f.bg:SetAllPoints()
         f.text = W.Text(f, BODY)
-        f.text:SetPoint("TOPLEFT")
+        f.text:SetPoint("TOPLEFT", 8, -5)
         f.text:SetJustifyH("LEFT")
         f.text:SetJustifyV("TOP")
         f.text:SetSpacing(2)
         return f
     end,
     set = function(f, r, width)
-        local indent = r.indent or 6
+        local indent = r.indent or 0
         f:SetWidth(width - indent)
-        f.text:SetWidth(width - indent - 6)
+        f.text:SetWidth(width - indent - 16)
         f.text:SetText(r.text or "")
         TextColor(f.text, r.color, "text")
-        local h = (f.text:GetStringHeight() or 14) + 6
+        local h = (f.text:GetStringHeight() or 14) + 10
         f:SetHeight(h)
         return h, indent
     end,
-    gap = 2,
+    gap = 3,
 }
 B.columns = B.text
 
+-- Label and value, as a table row on a dark bar.
 B.kv = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
-        f.key = W.Text(f, BODY)
-        f.key:SetPoint("TOPLEFT")
-        f.key:SetWidth(130)
+        Skin.Bar(f, "RowBg")
+        f.key = W.Text(f, "GameFontNormal")
+        f.key:SetPoint("TOPLEFT", 10, -5)
+        f.key:SetWidth(128)
         f.key:SetJustifyH("LEFT")
         f.key:SetWordWrap(false)
-        f.value = W.Text(f, BODY)
-        f.value:SetPoint("TOPLEFT", 136, 0)
+        f.value = W.Text(f, "GameFontHighlight")
+        f.value:SetPoint("TOPLEFT", 144, -5)
         f.value:SetJustifyH("LEFT")
         f.value:SetJustifyV("TOP")
         return f
     end,
     set = function(f, r, width)
-        f:SetWidth(width - 10)
+        f:SetWidth(width)
         f.key:SetText(r.key or "")
-        Skin.Color(f.key, "dim")
-        f.value:SetWidth(width - 10 - 142)
+        Skin.Color(f.key, "lootMid")
+        f.value:SetWidth(width - 154)
         f.value:SetText(r.text or "")
-        TextColor(f.value, r.color, "text")
-        local h = math.max(f.key:GetStringHeight() or 14, f.value:GetStringHeight() or 14) + 6
+        TextColor(f.value, r.color, "light")
+        local h = math.max(24, (f.value:GetStringHeight() or 14) + 10)
         f:SetHeight(h)
-        return h, 10
+        return h, 0
     end,
     gap = 1,
 }
@@ -519,41 +521,36 @@ B.kv = {
 -- One-line rows with a small icon: quests, zones, links.
 B.line = {
     new = function(parent)
-        local b = CreateFrame("Button", nil, parent)
-        b:SetHeight(26)
-        local hl = b:CreateTexture(nil, "HIGHLIGHT")
-        hl:SetAllPoints()
-        hl:SetColorTexture(0.45, 0.28, 0.08, 0.2)
+        local b = BarRow(parent, 26)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetSize(16, 16)
-        b.icon:SetPoint("LEFT", 6, 0)
-        b.text = W.Text(b, BODY)
+        b.icon:SetPoint("LEFT", 8, 0)
+        b.text = W.Text(b, "GameFontHighlight")
         b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
         b.text:SetJustifyH("LEFT")
         b.text:SetWordWrap(false)
-        b.mid = W.Text(b, BODY_SMALL)
+        b.mid = W.Text(b, "GameFontHighlightSmall")
         b.mid:SetJustifyH("RIGHT")
-        b.right = W.Text(b, BODY_SMALL)
-        b.right:SetPoint("RIGHT", -6, 0)
+        b.right = W.Text(b, "GameFontNormalSmall")
+        b.right:SetPoint("RIGHT", -10, 0)
         b.right:SetJustifyH("RIGHT")
         b.mid:SetPoint("RIGHT", b.right, "LEFT", -10, 0)
         b.text:SetPoint("RIGHT", b.mid, "LEFT", -8, 0)
-        Interactive(b)
         return b
     end,
     set = function(b, r, width)
         b:SetWidth(width)
         if r.icon then b.icon:SetTexture(r.icon); b.icon:SetTexCoord(0, 1, 0, 1); b.icon:Show() else b.icon:Hide() end
         b.text:SetText(r.text or "")
-        TextColor(b.text, r.color, "text")
+        TextColor(b.text, r.color, "light")
         b.mid:SetText(r.mid or "")
-        Skin.Color(b.mid, "dim")
+        Skin.Color(b.mid, "lootSub")
         b.right:SetText(r.right or "")
         TextColor(b.right, r.rightColor, "key")
         b:EnableMouse((r.onClick or r.tooltip) and true or false)
         return 26, 0
     end,
-    gap = 0,
+    gap = 1,
 }
 B.quest = B.line
 B.zone = B.line
@@ -642,9 +639,9 @@ B.filters = {
                 chip.mark:SetColorTexture(col[1], col[2], col[3], 1)
                 chip:SetAlpha(1)
             else
-                chip.text:SetTextColor(0.6, 0.6, 0.6)
+                chip.text:SetTextColor(0.78, 0.78, 0.78)
                 chip.mark:SetColorTexture(0, 0, 0, 0)
-                chip:SetAlpha(0.55)
+                chip:SetAlpha(0.8)
             end
             local w = math.floor((chip.text:GetStringWidth() or 50) + 18)
             if x > 0 and x + w > width then x, y = 0, y + lineH end

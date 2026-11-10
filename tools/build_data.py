@@ -12,8 +12,12 @@ source has are Classic reference numbers, so only those are bundled:
 
 Both are GPL-3.0 and parsed as data, never executed.
 
+With --questiedb, it also writes a snapshot of QuestieDB's WoW: Forever data (Data/Forever*.lua).
+The addon uses that snapshot only when no live Questie database is installed in the game.
+
 usage:
-  python3 -I tools/build_data.py --cmangos-sql PATH/full.sql [--scripts PATH/mangos-classic] [--out Data]
+  python3 -I tools/build_data.py --cmangos-sql PATH/full.sql [--scripts PATH/mangos-classic]
+                                 [--questiedb PATH/QuestieDB] [--out Data]
 """
 import argparse
 import collections
@@ -22,7 +26,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sources import sql_rows  # noqa: E402
+from sources import lua_list, read_questie_table, read_lua_assignment, sql_rows  # noqa: E402
 
 WORLD_POOL_SIZE = 60    # a reference table bigger than this is a random world-drop pool
 MAX_LOOT = 60           # loot rows kept per NPC (highest chance first)
@@ -193,11 +197,137 @@ def scan_scripts(root):
 
 
 # ---------------------------------------------------------------------------
+# Snapshot of QuestieDB's Forever data (the fallback when no live database is installed)
+# ---------------------------------------------------------------------------
+
+def L(t):
+    return lua_list(t) or []
+
+
+def csv(ids):
+    return ",".join(str(int(x)) for x in ids if isinstance(x, (int, float)) and x)
+
+
+def forever_snapshot(qdb, out, write):
+    import subprocess
+    fdir = os.path.join(qdb, "data", "Forever")
+    qnpc = read_questie_table(os.path.join(fdir, "foreverNpcDB.lua"), "QuestieDB.npcData")
+    qitem = read_questie_table(os.path.join(fdir, "foreverItemDB.lua"), "QuestieDB.itemData")
+    qquest = read_questie_table(os.path.join(fdir, "foreverQuestDB.lua"), "QuestieDB.questData")
+    print("questiedb: %d npcs, %d items, %d quests" % (len(qnpc), len(qitem), len(qquest)))
+
+    npcs = {}
+    for nid, r in qnpc.items():
+        r = L(r) + [None] * 16
+        name = clean(r[0])
+        if not name or "(Only GM" in name or name.startswith("[DND]"):
+            continue
+        zones = []
+        for area, pts in (r[6] if isinstance(r[6], dict) else {}).items():
+            pts = [L(p) for p in L(pts) if isinstance(p, dict)]
+            pts = [p for p in pts if len(p) >= 2 and isinstance(p[0], (int, float)) and p[0] >= 0]
+            if not pts:
+                zones.append((0, area, None))
+                continue
+            cx = sum(p[0] for p in pts) / len(pts)
+            cy = sum(p[1] for p in pts) / len(pts)
+            best = min(pts, key=lambda p: (p[0] - cx) ** 2 + (p[1] - cy) ** 2)
+            zones.append((-len(pts), area, best))
+        zones.sort(key=lambda z: (z[0], z[1]))
+        zstr = ",".join("%d:%s:%s:%d" % (a, ("%.1f" % p[0]) if p else "", ("%.1f" % p[1]) if p else "", -c) for c, a, p in zones)
+        npcs[nid] = "^".join([name, clean(r[13] or ""), str(num(r[3])), str(num(r[4])), str(num(r[5])), zstr,
+                              str(num(r[8])), r[12] or "", csv(L(r[9])), csv(L(r[10])), str(num(r[14]))])
+
+    items = {}
+    for iid, r in qitem.items():
+        r = L(r) + [None] * 16
+        items[iid] = "^".join([clean(r[0]), str(num(r[8])), str(num(r[9])), str(num(r[11])), str(num(r[12])),
+                               csv(L(r[1])), csv(L(r[13])), csv(L(r[3])), str(len([x for x in L(r[2]) if x])),
+                               str(num(r[4])), csv(L(r[5]))])
+
+    quests = {}
+    for qid, r in qquest.items():
+        r = L(r) + [None] * 30
+        sb, fb = L(r[1]) + [None] * 3, L(r[2]) + [None] * 2
+        obj = L(r[9]) + [None] * 6
+        kill = [L(o)[0] for o in L(obj[0]) if o and L(o)]
+        for kc in L(obj[4]):
+            kc = L(kc)
+            if kc:
+                kill += [x for x in L(kc[0]) if x]
+                if len(kc) > 1 and kc[1]:
+                    kill.append(kc[1])
+        objitems = [L(o)[0] for o in L(obj[2]) if o and L(o)]
+        text = clean(" ".join(x for x in L(r[7]) if isinstance(x, str)))
+        if len(text) > 400:
+            text = text[:397] + "..."
+        quests[qid] = "^".join([clean(r[0]), str(num(r[4])), str(num(r[3])), str(int(num(r[5]))), str(int(num(r[6]))), text,
+                                csv(L(sb[0])), csv(L(sb[2])), csv(L(fb[0])), csv(sorted(set(kill))),
+                                csv(sorted(set(objitems))), csv(L(r[20]))])
+
+    write("ForeverNpcs.lua", "fnpc", npcs, "name^subName^minLevel^maxLevel^rank^zones(area:x:y:spawns,...)^zoneID^friendly^questStarts^questEnds^npcFlags")
+    write("ForeverItems.lua", "fitem", items, "name^itemLevel^requiredLevel^class^subClass^npcDrops^vendors^containers^objectCount^startQuest^questRewards")
+    write("ForeverQuests.lua", "fquest", quests, "name^level^requiredLevel^raceMask^classMask^text^starterNpcs^starterItems^enderNpcs^killNpcs^items^sourceItems")
+
+    # Wowhead drop rates for quest items
+    rates = read_lua_assignment(os.path.join(qdb, "support", "Forever", "DropTables", "classicItemDrops.lua"),
+                                r"wowheadData\s*=\s*\[\[\s*return\s*")
+    rate_out = {}
+    for iid, per in rates.items():
+        if isinstance(per, dict):
+            pairs = ["%d:%s" % (n, fmt_chance(c)) for n, c in sorted(per.items()) if isinstance(c, (int, float)) and n > 0]
+            if pairs:
+                rate_out[iid] = ",".join(pairs)
+    write("ForeverRates.lua", "frate", rate_out, "Wowhead drop rates for quest items: item -> npc:percent,...")
+
+    # zones
+    zdir = os.path.join(qdb, "support", "Forever", "Zones")
+    names, uimap, dungeons, inst = {}, {}, {}, {}
+    text = open(os.path.join(zdir, "areaIdToUiMapId.lua"), encoding="utf-8").read()
+    for m in re.finditer(r"\[(\d+)\]\s*=\s*(\d+),\s*--\s*([^\n]+)", text):
+        area, ui, comment = int(m.group(1)), int(m.group(2)), m.group(3).strip()
+        if ui:
+            uimap.setdefault(area, ui)
+        nm = comment.split("->")[0].strip()
+        if nm and not nm.lower().startswith(("existing", "synthetic", "referenced", "legacy", "retain")) and ":" not in nm:
+            names.setdefault(area, nm)
+    dtext = open(os.path.join(zdir, "dungeons.lua"), encoding="utf-8").read()
+    for m in re.finditer(r"\[(\d+)\]\s*=\s*\{\"([^\"]+)\",(nil|\{[\d,\s]*\})", dtext):
+        area, nm, alts = int(m.group(1)), m.group(2), m.group(3)
+        dungeons[area] = nm + "|" + ("" if alts == "nil" else ",".join(re.findall(r"\d+", alts)))
+    enum = open(os.path.join(qdb, "src", "corrections", "enum", "zones.lua"), encoding="utf-8").read()
+    zone_ids = {}
+    for m in re.finditer(r"^\s*([A-Z0-9_]+)\s*=\s*(\d+),", enum, re.M):
+        zone_ids[m.group(1)] = int(m.group(2))
+        if int(m.group(2)) not in names and "PROTOTYPE" not in m.group(1):
+            names[int(m.group(2))] = m.group(1).replace("_", " ").title().replace("'S ", "'s ")
+    itext = open(os.path.join(zdir, "instanceIdToAreaId.lua"), encoding="utf-8").read()
+    for m in re.finditer(r"\[(\d+)\]\s*=\s*ZoneDB\.zoneIDs\.([A-Z0-9_]+)", itext):
+        if m.group(2) in zone_ids:
+            inst[int(m.group(1))] = zone_ids[m.group(2)]
+    try:
+        stamp = subprocess.run(["git", "-C", qdb, "log", "-1", "--format=%h %cs"], capture_output=True, text=True).stdout.split()
+    except OSError:
+        stamp = []
+    path = os.path.join(out, "ForeverZones.lua")
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("-- Generated by tools/build_data.py from QuestieDB (WoW: Forever) - do not edit by hand.\nlocal _, SB = ...\n")
+        f.write("SB.D.finfo = { commit = %s, date = %s }\n" % (lua_str(stamp[0] if stamp else "?"), lua_str(stamp[1] if len(stamp) > 1 else "?")))
+        for var, table, quote in (("fzoneName", names, True), ("fuiMap", uimap, False), ("fdungeon", dungeons, True), ("finstance", inst, False)):
+            f.write("SB.D.%s = {\n" % var)
+            for k in sorted(table):
+                f.write("[%d]=%s,\n" % (k, lua_str(table[k]) if quote else table[k]))
+            f.write("}\n")
+    print("  %-14s %15.0f KB" % ("ForeverZones.lua", os.path.getsize(path) / 1024))
+
+
+# ---------------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cmangos-sql", required=True)
     ap.add_argument("--scripts")
+    ap.add_argument("--questiedb")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data"))
     a = ap.parse_args()
 
@@ -307,8 +437,9 @@ def main():
 
     def write(fname, var, table, comment):
         path = os.path.join(a.out, fname)
+        source = "QuestieDB (WoW: Forever)" if fname.startswith("Forever") else "CMaNGOS (Classic)"
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write("-- Generated by tools/build_data.py from CMaNGOS (Classic) - do not edit by hand.\n-- %s\n" % comment)
+            f.write("-- Generated by tools/build_data.py from %s - do not edit by hand.\n-- %s\n" % (source, comment))
             f.write("local _, SB = ...\nSB.D.%s = {\n" % var)
             for k in sorted(table):
                 f.write("[%s]=%s,\n" % (k, lua_str(table[k])))
@@ -322,6 +453,8 @@ def main():
     write("Spells.lua", "spells", spell_out, "Spells each NPC casts (spell lists, EventAI and boss scripts).")
     write("Trainers.lua", "trainer", trainer_out, "What each trainer teaches: tN = template N; spell:cost(copper):level:skillLine:skillValue,...")
     write("TrainerTemplates.lua", "ttpl", ttpl_out, "Shared trainer lists: spell:cost(copper):level:skillLine:skillValue,...")
+    if a.questiedb:
+        forever_snapshot(a.questiedb, a.out, write)
 
 
 if __name__ == "__main__":

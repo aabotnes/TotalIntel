@@ -56,6 +56,16 @@ function SB.Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage(SB.TITLE .. ": " .. msg)
 end
 
+-- Errors the addon caught instead of interrupting the game; /tits status lists them.
+SB.errors = {}
+function SB.Error(where, err)
+    local text = tostring(where) .. ": " .. tostring(err)
+    for _, e in ipairs(SB.errors) do
+        if e.text == text then e.count = e.count + 1 return end
+    end
+    if #SB.errors < 8 then SB.errors[#SB.errors + 1] = { text = text, count = 1 } end
+end
+
 function SB.After(sec, fn)
     if C_Timer and C_Timer.After then C_Timer.After(sec, fn) else fn() end
 end
@@ -102,14 +112,19 @@ function SB.List(s, sep)
     return out
 end
 
+-- Money with coin icons, as in the bag window: "2 (gold) 18 (silver) 97 (copper)".
+local COINS = {
+    "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t",
+    "|TInterface\\MoneyFrame\\UI-SilverIcon:0:0:2:0|t",
+    "|TInterface\\MoneyFrame\\UI-CopperIcon:0:0:2:0|t",
+}
 function SB.Money(copper)
-    copper = tonumber(copper) or 0
-    if GetCoinTextureString then return GetCoinTextureString(copper) end
+    copper = math.floor(tonumber(copper) or 0)
     local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
     local t = {}
-    if g > 0 then t[#t + 1] = g .. "g" end
-    if s > 0 then t[#t + 1] = s .. "s" end
-    if c > 0 or #t == 0 then t[#t + 1] = c .. "c" end
+    if g > 0 then t[#t + 1] = g .. COINS[1] end
+    if s > 0 then t[#t + 1] = s .. COINS[2] end
+    if c > 0 or #t == 0 then t[#t + 1] = c .. COINS[3] end
     return table.concat(t, " ")
 end
 
@@ -186,7 +201,10 @@ frame:SetScript("OnEvent", function(_, event, ...)
     if not list then return end
     for i = 1, #list do
         local ok, err = pcall(list[i], ...)
-        if not ok and SB.debug then SB.Print("|cffff5555" .. event .. "|r " .. tostring(err)) end
+        if not ok then
+            SB.Error(event, err)
+            if SB.debug then SB.Print("|cffff5555" .. event .. "|r " .. tostring(err)) end
+        end
     end
 end)
 
@@ -266,25 +284,34 @@ function SB.Status()
     local q = SB.QDB()
     SB.Print("status")
     local function Line(label, value) DEFAULT_CHAT_FRAME:AddMessage("   |cffffd100" .. label .. ":|r " .. tostring(value)) end
-    if q then
-        Line("NPC/quest data", SB.dataSource == "Questie" and "Questie's built-in database" or "QuestieDB addon (LibQuestieDB)")
-    else
+    if SB.dataSource == "bundled" then
+        local info = q.info or {}
         local why = _G.LibQuestieDB and "QuestieDB is loaded but didn't answer"
-            or (_G.QuestieLoader and "Questie is loaded but its database isn't ready (or is an unsupported version)")
-            or "neither Questie nor QuestieDB is loaded"
-        Line("NPC/quest data", "|cffff5555none|r - " .. why)
+            or (_G.QuestieLoader and "Questie is loaded, but its database isn't ready or is a version Total Intel can't read")
+            or "no Questie database is installed"
+        Line("NPC/quest data", ("bundled snapshot of QuestieDB (%s) - %s"):format(tostring(info.date), why))
+    elseif q then
+        Line("NPC/quest data", SB.dataSource == "Questie" and "live: Questie's built-in database" or "live: QuestieDB addon (LibQuestieDB)")
+    else
+        Line("NPC/quest data", "|cffff5555none|r")
     end
     local idx = SB.index or {}
     local npcs, items = 0, 0
     for _ in pairs(idx.npcsInArea or {}) do npcs = npcs + 1 end
     for _ in pairs(idx.itemFor or {}) do items = items + 1 end
-    Line("Index", (idx.ready and "ready" or "building...") .. (" (%d zones with mobs, %d quest items)"):format(npcs, items))
+    Line("Index", (idx.error and ("|cffff5555failed:|r " .. idx.error) or idx.ready and "ready" or "building...")
+        .. (" (%d zones with mobs, %d quest items)"):format(npcs, items))
     local mobs = 0
     for _ in pairs(SB.db.mobs) do mobs = mobs + 1 end
     Line("Your bestiary", SB.Plural(mobs, "mob"))
     Line("Recipes read", SB.Crafting and SB.Crafting.Count() or 0)
     local _, build, _, toc = GetBuildInfo()
     Line("Game", tostring(build) .. " / " .. tostring(toc))
+    if #SB.errors == 0 then
+        Line("Errors", "none")
+    else
+        for _, e in ipairs(SB.errors) do Line("Error x" .. e.count, "|cffff5555" .. e.text .. "|r") end
+    end
 end
 
 -- Key bindings (Bindings.xml)

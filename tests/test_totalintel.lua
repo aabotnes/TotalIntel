@@ -266,18 +266,40 @@ check(SB.CurrentPage().id == 999999, "unknown NPC page doesn't error")
 M.Advance(5)
 
 ------------------------------------------------------------------------------
--- Without QuestieDB: Classic reference data still works
+-- No Questie installed: the bundled Forever snapshot
 ------------------------------------------------------------------------------
 local saved = LibQuestieDB
 LibQuestieDB = nil
 SB.ResetSources()
 SB.BuildIndex(true)
-local bare = SB.GetNpc(RAGNAROS)
-check(bare and bare.boss and SB.GetLoot(RAGNAROS)[1], "without QuestieDB: Classic loot and boss flag still there")
+check(SB.QDB() and SB.dataSource == "bundled", "without Questie, the bundled snapshot of Forever data is used")
+local MURLOC = 735
+local murloc = SB.GetNpc(MURLOC)
+check(murloc.name == "Murloc Streamrunner" and murloc.minLevel == 6 and murloc.zones[1].area == 12 and murloc.zones[1].count == 20,
+    "Murloc Streamrunner: level and Elwynn Forest spawns from the snapshot")
+local forQuests = {}
+for _, d in ipairs(SB.DropFor(MURLOC)) do forQuests[d.quest] = d.item end
+check(forQuests[112] == 1256 and forQuests[150] == 1468, "it drops items for Collecting Kelp and Murloc Poachers")
+SB.OpenNpc(MURLOC)
+SB.SetTab("quests")
+check(Content("Needed for") and Content("Collecting Kelp") and Content("Murloc Poachers"), "its Quests tab lists them")
+SB.SetTab("loot")
+check(Content("Crystal Kelp Frond") and Content("%(Wowhead%)"), "its loot has the quest items with Wowhead rates")
+check(SB.Search("murloc streamr")[1].id == MURLOC, "search finds a mob you've never seen")
+SlashCmdList.TOTALINTEL("murloc streamrunner")
+check(SB.CurrentPage().kind == "npc" and SB.CurrentPage().id == MURLOC, "/tits <name> opens it")
+SlashCmdList.TOTALINTEL("murloc")
+local sr = SB.SidebarRows()
+check(sr[1].kind == "header" and sr[1].text == "Mobs and NPCs" and RowsHave(sr, "Items"), "search results are grouped into mobs and items")
+check(SB.ZoneName(40) == "Westfall", "zone names fall back to the snapshot")
+local deadmines
+for _, inst in ipairs(SB.Instances(false)) do if inst.map == 36 then deadmines = inst end end
+check(deadmines and #deadmines.bosses >= 5 and deadmines.name == "The Deadmines", "dungeons come from the snapshot (" .. (deadmines and #deadmines.bosses or 0) .. " Deadmines bosses)")
 lines = HoverUnit()
-check(Has(lines, "Abilities:"), "without QuestieDB: tooltips still show abilities", lines)
+check(Has(lines, "Abilities:"), "tooltips work on the snapshot", lines)
 LibQuestieDB = saved
 SB.ResetSources()
+check(SB.QDB() and SB.dataSource == "QuestieDB", "a live QuestieDB is preferred when it's installed")
 
 ------------------------------------------------------------------------------
 -- Loot tab: filter by rarity
@@ -319,7 +341,7 @@ M.Advance(1)
 local sells, src = SB.Sells(VENDOR)
 check(src == "game" and #sells == 2 and sells[2].limited and sells[2].stack == 5, "Sells: read from the merchant window, with stock")
 SB.SetTab("sells")
-check(Content("2500c") and Content("x5, limited"), "Sells tab shows prices and limited stock")
+check(Content("25|T.*SilverIcon") and Content("x5, limited"), "Sells tab shows prices in coins and limited stock")
 
 local TRAINER = 198
 local teach, tsrc = SB.Teaches(TRAINER)
@@ -327,7 +349,9 @@ check(tsrc == "classic" and teach[1] and teach[1].spell == 1472, "Teaches: Class
 SB.OpenNpc(TRAINER)
 SB.SetTab("teaches")
 local row = Content("Spell1142")
-check(row and row.kind == "teach" and row.sub:find("level 4") and row.mid == "|cffff4040100c|r",
+check(SB.Money(21897) == "2|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t 18|TInterface\\MoneyFrame\\UI-SilverIcon:0:0:2:0|t 97|TInterface\\MoneyFrame\\UI-CopperIcon:0:0:2:0|t",
+    "money is shown with coin icons, like the bag window")
+check(row and row.kind == "teach" and row.sub:find("level 4") and row.mid == "|cffff4040" .. SB.Money(100) .. "|r",
     "Teaches: one row per spell with its requirement, and the cost in red when you can't afford it")
 
 -- a fishing trainer: your skill bar on top, requirements green or red against your skill
@@ -341,7 +365,7 @@ SB.SetTab("teaches")
 local bar = Content("Your Fishing")
 check(bar and bar.kind == "bar" and bar.value == nil, "Teaches: a skill bar that says when you haven't learned the profession")
 local journeyman = Content("Spell7734")
-check(journeyman.sub:find("|cffff4040Fishing 50", 1, true) and journeyman.mid == "500c", "Journeyman Fishing: requirement in red without the skill, cost in coins")
+check(journeyman.sub:find("|cffff4040Fishing 50", 1, true) and journeyman.mid == SB.Money(500) and journeyman.mid:find("^5|T.*SilverIcon"), "Journeyman Fishing: requirement in red without the skill, cost in coins")
 M.fishing = 37
 SB.SetTab("teaches")
 bar = Content("Your Fishing")
@@ -386,10 +410,10 @@ QuestieLoader = { ImportModule = function(_, name)
     return saved.Support.Get(name)
 end }
 SB.ResetSources()
-check(SB.QDB() == nil, "Questie's database isn't used before Questie has loaded it")
+check(SB.QDB() and SB.dataSource == "bundled", "until Questie has loaded its database, the bundled snapshot is used")
 ready = true
 M.Advance(4)
-check(SB.QDB() and SB.dataSource == "Questie", "Questie's built-in database is found once it's ready")
+check(SB.QDB() and SB.dataSource == "Questie", "Questie's built-in database takes over once it's ready")
 SB.BuildIndex(true)
 check(SB.GetNpc(HOGGER).zones[1].area == 12 and SB.GetQuest(176).items[1] == CLAW, "spawns and quests read through Questie's database")
 QuestieLoader = nil

@@ -73,8 +73,12 @@ local FLAT = {
         HeaderLine = { 1, 0.78, 0.25, 0.6 },
         BarBg = { 0, 0, 0, 0.55 },
         IconEdge = { 0, 0, 0, 0.9 },
+        NoteBg = { 1, 0.95, 0.8, 0.45 },      -- a light paper backing for ink on the parchment
+        NoteEdge = { 0.25, 0.15, 0.05, 0.35 },
     },
     dark = {
+        NoteBg = { 0.13, 0.13, 0.15, 0.92 },
+        NoteEdge = { 1, 1, 1, 0.06 },
         RowBg = { 0.09, 0.09, 0.11, 0.92, to = { 0.15, 0.15, 0.18, 0.92 } },
         RowBgSel = { 0.26, 0.19, 0.06, 0.96, to = { 0.38, 0.28, 0.08, 0.96 } },
         RowEdgeTop = { 1, 1, 1, 0.07 },
@@ -103,26 +107,25 @@ end
 -- colors per style
 local PALETTE = {
     journal = {
-        -- ink on the parchment
-        text = { 0.18, 0.1, 0.02 },           -- dark brown body text
-        dim = { 0.28, 0.18, 0.08 },
-        key = { 0.3, 0.12, 0.0 },
-        good = { 0.05, 0.36, 0.02 }, warn = { 0.5, 0.25, 0 }, off = { 0.4, 0.35, 0.3 },
-        -- light text on the dark bands, boss buttons and loot frames
+        -- ink, only ever drawn on the light paper backing (NoteBg): about 9:1
+        text = { 0.09, 0.045, 0.0 },
+        -- light text on the dark bars, bands and buttons: 7:1 or better
         title = { 0.96, 0.87, 0.72 },         -- page titles on the header band
-        boss = { 1, 0.86, 0.6 },              -- names on boss buttons
+        boss = { 1, 0.86, 0.6 },              -- mob names
         bossSub = { 0.9, 0.82, 0.68 },
-        header = { 1, 0.82, 0 },              -- text on paper headers
-        lootSub = { 0.88, 0.8, 0.66 },
-        lootMid = { 1, 0.92, 0.7 },
+        header = { 1, 0.82, 0 },              -- section headers
+        light = { 1, 0.96, 0.88 },            -- names and values
+        lootSub = { 0.88, 0.8, 0.66 },        -- second lines
+        lootMid = { 1, 0.92, 0.7 },           -- chances, prices, labels
+        key = { 1, 0.82, 0 },
         you = { 0.55, 0.85, 1 },
-        light = { 1, 0.96, 0.88 },
+        good = { 0.35, 1, 0.35 }, warn = { 1, 0.82, 0 }, off = { 0.72, 0.72, 0.72 },
     },
     dark = {
-        text = { 0.9, 0.9, 0.9 }, dim = { 0.65, 0.65, 0.65 }, key = { 1, 0.82, 0 },
-        title = { 1, 0.82, 0 }, boss = { 1, 0.86, 0.6 }, bossSub = { 0.75, 0.75, 0.75 }, header = { 1, 0.82, 0 },
-        good = { 0.4, 1, 0.4 }, warn = { 1, 0.82, 0 }, off = { 0.55, 0.55, 0.55 }, you = { 0.55, 0.85, 1 },
-        lootSub = { 0.75, 0.75, 0.75 }, lootMid = { 1, 0.92, 0.7 }, light = { 1, 1, 1 },
+        text = { 0.92, 0.92, 0.92 },
+        title = { 1, 0.82, 0 }, boss = { 1, 0.86, 0.6 }, bossSub = { 0.78, 0.78, 0.78 }, header = { 1, 0.82, 0 },
+        light = { 1, 1, 1 }, lootSub = { 0.78, 0.78, 0.78 }, lootMid = { 1, 0.92, 0.7 }, key = { 1, 0.82, 0 },
+        you = { 0.55, 0.85, 1 }, good = { 0.35, 1, 0.35 }, warn = { 1, 0.82, 0 }, off = { 0.72, 0.72, 0.72 },
     },
 }
 
@@ -194,6 +197,14 @@ function Skin.Bar(frame, name)
     top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(1)
     local bottom = Skin.New(frame, "RowEdgeBottom", "BORDER")
     bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT"); bottom:SetHeight(1)
+    return bg
+end
+
+-- A light paper backing behind ink text, so it reads the same on every patch of the parchment.
+function Skin.Paper(frame, layer, sub)
+    local bg = Skin.New(frame, "NoteBg", layer or "BACKGROUND", sub)
+    local edge = Skin.New(frame, "NoteEdge", "BORDER")
+    edge:SetPoint("BOTTOMLEFT", bg); edge:SetPoint("BOTTOMRIGHT", bg); edge:SetHeight(1)
     return bg
 end
 

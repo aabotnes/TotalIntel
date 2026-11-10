@@ -13,4 +13,5 @@ They cover:
 - recording kills, loot and spells, without the combat log
 - crafting read from the client's profession API
 - the journal: pages and side tabs, every vendor and dropper listed, the Crafted tab, the Dungeons and Raids grids, instance pages, map pins, search, Alt-click on items and mobs, and the style switch
-- fallback without QuestieDB
+- the bundled Forever snapshot when no Questie database is installed, and switching to a live one
+- the Loot rarity filter, Teaches rows with your skill, Sells, and coin prices

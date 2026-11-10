@@ -173,7 +173,7 @@ function SB.AddNpcLines(tt, id, unit)
     end
 
     if shown and o.hint then
-        Add(tt, "Alt-click it or type /tits for the full page", { 0.45, 0.45, 0.45 })
+        Add(tt, "Alt-click it or type /tits for the full page", { 0.62, 0.62, 0.62 })
     end
 end
 
@@ -281,7 +281,7 @@ local function OnUnit(tt, data)
     if not id and data then id = SB.NpcIdFromGUID(data.guid) end
     if not id then return end
     local okAdd, err = pcall(SB.AddNpcLines, tt, id, unit)
-    if not okAdd and SB.debug then SB.Print("tooltip: " .. tostring(err)) end
+    if not okAdd then SB.Error("mob tooltip", err) end
 end
 
 local function OnItem(tt, data)
@@ -294,7 +294,7 @@ local function OnItem(tt, data)
     end
     if not id then return end
     local okAdd, err = pcall(SB.AddItemLines, tt, id)
-    if not okAdd and SB.debug then SB.Print("tooltip: " .. tostring(err)) end
+    if not okAdd then SB.Error("item tooltip", err) end
 end
 
 SB.AddLoad(function()

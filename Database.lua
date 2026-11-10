@@ -63,36 +63,49 @@ local function QuestieBuiltIn()
     }
 end
 
--- The live database: the QuestieDB addon (LibQuestieDB), or Questie's built-in one.
--- Looked for again (every few seconds) until one answers, since Questie loads its data late.
-function SB.QDB()
-    if LQ then return LQ end
-    local now = GetTime and GetTime() or 0
-    if now - lastTry < 3 then return nil end
-    lastTry = now
+local function FindLive()
     local lib = _G.LibQuestieDB
     if type(lib) == "table" and lib.Npc and lib.Item and lib.Quest then
         local ok, res = true, true
         if lib.RequireContract then ok, res = pcall(lib.RequireContract, 1) end
-        if ok and res ~= false then LQ, SB.dataSource = lib, "QuestieDB" end
+        if ok and res ~= false then return lib, "QuestieDB" end
     end
-    if not LQ then
-        local q = QuestieBuiltIn()
-        if q then LQ, SB.dataSource = q, "Questie" end
-    end
-    if not LQ then return nil end
-    NpcDB, ItemDB, QuestDB = LQ.Npc, LQ.Item, LQ.Quest
-    if LQ.Support and LQ.Support.Get then
-        local ok, z = pcall(LQ.Support.Get, "ZoneDB")
+    local q = QuestieBuiltIn()
+    if q then return q, "Questie" end
+end
+
+local function Adopt(db, source)
+    LQ, SB.dataSource = db, source
+    NpcDB, ItemDB, QuestDB, ZoneDB, DropRates = db.Npc, db.Item, db.Quest, nil, nil
+    if db.Support and db.Support.Get then
+        local ok, z = pcall(db.Support.Get, "ZoneDB")
         if ok then ZoneDB = z end
     end
-    -- found it after the first index was built: rebuild with the live data
     if SB.ResetCaches then SB.ResetCaches() end
-    if SB.index and SB.index.built and SB.BuildIndex then SB.After(0.5, function() SB.BuildIndex() end) end
+    -- a different database than the index was built from: build it again
+    if SB.index and SB.index.started and SB.BuildIndex then SB.After(0.5, function() SB.BuildIndex() end) end
+end
+
+-- The database for NPCs, quests and items. A live one is preferred: the QuestieDB addon
+-- (LibQuestieDB) or Questie's built-in database, which Questie fills a few seconds after login,
+-- so it is looked for again every few seconds. Until one answers, and when neither is
+-- installed, the bundled snapshot of QuestieDB's Forever data is used (Bundled.lua).
+function SB.QDB()
+    if LQ and SB.dataSource ~= "bundled" then return LQ end
+    local now = GetTime and GetTime() or 0
+    if now - lastTry >= 3 then
+        lastTry = now
+        local live, source = FindLive()
+        if live then Adopt(live, source) return LQ end
+    end
+    if not LQ then
+        local b = SB.Bundled and SB.Bundled()
+        if b then Adopt(b, "bundled") end
+    end
     return LQ
 end
 
--- Forgets QuestieDB lookups (used by the tests to swap databases).
+-- Forgets the database (used by the tests to swap databases).
 function SB.ResetSources()
     LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates, lastTry = nil, nil, nil, nil, nil, nil, -100
     SB.dataSource = nil
@@ -167,8 +180,8 @@ end
 local uiMapOf, areasOfUiMap, dungeonParent, dungeonName
 local function ZoneTables()
     if uiMapOf then return end
+    SB.QDB()   -- first: finding a database resets these tables
     uiMapOf, areasOfUiMap, dungeonParent, dungeonName = {}, {}, {}, {}
-    SB.QDB()
     local priv = ZoneDB and ZoneDB.private or {}
     for _, key in ipairs({ "areaIdToUiMapId", "areaIdToUiMapIdOverride" }) do
         local src = priv[key]
@@ -204,7 +217,8 @@ function SB.ZoneName(area)
         local ok, name = pcall(C_Map.GetAreaInfo, area)
         if ok and type(name) == "string" and name ~= "" then return name end
     end
-    return "Zone #" .. area
+    local names = ZoneDB and ZoneDB.names
+    return names and names[area] or ("Zone #" .. area)
 end
 
 local function InstanceAreaTable()
@@ -263,26 +277,12 @@ local function Build(yield)
         if yield and count % 150 == 0 then coroutine.yield() end
     end
     local n = {
-        classicDroppers = {}, -- item -> { {npc, chance, quest} } from the Classic loot tables
         foreverItems = {},     -- npc  -> { item, ... } from QuestieDB's npcDrops
         sells = {},            -- npc  -> { item, ... } from QuestieDB's vendors
         npcsInArea = {},       -- area -> { npc, ... }
         killFor = {},          -- npc  -> { quest, ... }
         itemFor = {},          -- item -> { quest, ... } (quest objectives and required items)
     }
-    for npc, raw in pairs(D.loot or {}) do
-        for item, chance, q in raw:gmatch("(%d+):([%d.]+):?(q?)") do
-            Add(n.classicDroppers, tonumber(item), { npc = npc, chance = tonumber(chance), quest = q == "q" })
-        end
-        Tick()
-    end
-    n.classicChance = {}       -- item -> { [npc] = chance }
-    for item, list in pairs(n.classicDroppers) do
-        table.sort(list, function(a, b) return a.chance > b.chance end)
-        local t = {}
-        for _, d in ipairs(list) do t[d.npc] = d.chance end
-        n.classicChance[item] = t
-    end
     if SB.QDB() then
         for _, item in ipairs(AllIds(ItemDB)) do
             for _, npc in ipairs(I(item, "npcDrops") or {}) do Add(n.foreverItems, npc, item) end
@@ -321,20 +321,26 @@ local function Build(yield)
     for k, v in pairs(n) do idx[k] = v end
     idx.ready = true
     idx.built = true
-    idx.withData = SB.QDB() ~= nil
+    idx.source = SB.dataSource
     if SB.OnIndexReady then SB.OnIndexReady() end
 end
 
--- now = build synchronously (tests); otherwise spread over a few seconds after login
+-- now = build synchronously (tests); otherwise spread over a few seconds after login.
+-- Starting a build while one is running replaces it.
+local generation = 0
 function SB.BuildIndex(now)
-    idx.ready = false
+    idx.ready, idx.started, idx.error = false, true, nil
+    generation = generation + 1
+    local mine = generation
     if now or not (C_Timer and C_Timer.NewTicker) then Build(false) return end
     local co = coroutine.create(function() Build(true) end)
     local ticker
     ticker = C_Timer.NewTicker(0.02, function()
+        if mine ~= generation then ticker:Cancel() return end
         local ok, err = coroutine.resume(co)
         if not ok then
-            if SB.debug then SB.Print("index: " .. tostring(err)) end
+            idx.error = tostring(err)
+            SB.Print("|cffff5555couldn't read the database:|r " .. idx.error .. " (type /tits status and send this to the author)")
             ticker:Cancel()
         elseif coroutine.status(co) == "dead" then
             ticker:Cancel()
@@ -343,13 +349,14 @@ function SB.BuildIndex(now)
 end
 SB.On("PLAYER_LOGIN", function()
     SB.After(2, function() SB.BuildIndex() end)
-    -- Questie fills its database a little after login; keep looking for two minutes
+    -- Questie fills its database a little after login: check for it for a few minutes
     if C_Timer and C_Timer.NewTicker then
         local tries = 0
         local t
-        t = C_Timer.NewTicker(4, function()
+        t = C_Timer.NewTicker(5, function()
             tries = tries + 1
-            if SB.QDB() or tries > 30 then t:Cancel() end
+            SB.QDB()
+            if SB.dataSource ~= "bundled" or tries > 40 then t:Cancel() end
         end)
     end
 end)
@@ -367,7 +374,7 @@ local function Zones(id, c)
         for area, pts in pairs(spawns) do
             local list = {}
             for _, p in ipairs(pts) do if type(p) == "table" and p[1] and p[1] >= 0 then list[#list + 1] = p end end
-            local z = { area = area, count = #list }
+            local z = { area = area, count = pts.count or #list }
             if #list > 0 then
                 local cx, cy = 0, 0
                 for _, p in ipairs(list) do cx, cy = cx + p[1], cy + p[2] end
@@ -482,8 +489,9 @@ function SB.DropFor(id)
     for _, d in ipairs(SB.GetLoot(id)) do
         for _, q in ipairs(idx.itemFor and idx.itemFor[d.item] or {}) do
             local it = SB.GetItem(d.item)
-            -- quest items, or items few mobs drop; Linen Cloth turn-ins aren't a reason to flag every humanoid
-            local few = SB.DropperCount(d.item) <= 20
+            -- quest items, or items a limited set of mobs drop (Murloc Fin: yes; Linen Cloth, dropped by
+            -- 700 kinds of mob: no)
+            local few = SB.DropperCount(d.item) <= 100
             if (d.quest or it.class == 12 or few) and not seen[q .. ":" .. d.item] then
                 seen[q .. ":" .. d.item] = true
                 out[#out + 1] = { quest = q, item = d.item }
@@ -583,23 +591,55 @@ function SB.GetSpells(id)
     return Ids(D.spells and D.spells[id])
 end
 
+-- Classic loot is stored per NPC ("item:chance[:q],..."). Who drops an item is found by searching
+-- those strings when asked (about a millisecond), and the last few hundred answers are kept:
+-- an up-front table of every drop would cost tens of megabytes.
+local function ClassicEntry(raw, item)
+    if not raw then return nil end
+    local needle = item .. ":"
+    local a, b = raw:find(needle, 1, true)
+    while a do
+        if a == 1 or raw:byte(a - 1) == 44 then
+            local chance, q = raw:match("^([%d.]+)(:?q?)", b + 1)
+            return tonumber(chance), q == ":q"
+        end
+        a, b = raw:find(needle, b + 1, true)
+    end
+end
+
+local byItem, byItemCount = {}, 0
+local function ClassicDroppers(item)
+    local list = byItem[item]
+    if list then return list end
+    list = {}
+    for npc, raw in pairs(D.loot or {}) do
+        local chance, quest = ClassicEntry(raw, item)
+        if chance then list[#list + 1] = { npc = npc, chance = chance, quest = quest } end
+    end
+    table.sort(list, function(a, b)
+        if a.chance ~= b.chance then return a.chance > b.chance end
+        return a.npc < b.npc
+    end)
+    if byItemCount > 300 then byItem, byItemCount = {}, 0 end
+    byItem[item] = list
+    byItemCount = byItemCount + 1
+    return list
+end
+
 -- The chance for one NPC/item pair: Wowhead's rate for quest items, else the Classic number.
 local function ChanceFor(npc, item)
     local rates = WowheadRates()
     local r = rates and rates[item] and rates[item][npc]
     if r then return r, "wowhead" end
-    local c = idx.classicChance and idx.classicChance[item] and idx.classicChance[item][npc]
+    local c = ClassicEntry(D.loot and D.loot[npc], item)
     if c then return c, "classic" end
-    if not idx.ready then
-        for _, d in ipairs(ParseLoot(D.loot and D.loot[npc])) do if d.item == item then return d.chance, "classic" end end
-    end
 end
 
 -- How many NPCs drop the item (cheap; no chances looked up).
 function SB.DropperCount(item)
     local seen, n = {}, 0
     for _, npc in ipairs(I(item, "npcDrops") or {}) do if not seen[npc] then seen[npc] = true; n = n + 1 end end
-    for npc in pairs(idx.classicChance and idx.classicChance[item] or {}) do if not seen[npc] then seen[npc] = true; n = n + 1 end end
+    for _, d in ipairs(ClassicDroppers(item)) do if not seen[d.npc] then seen[d.npc] = true; n = n + 1 end end
     return n
 end
 
@@ -614,7 +654,7 @@ function SB.Droppers(item)
             out[#out + 1] = { npc = npc, chance = chance, src = src }
         end
     end
-    for _, d in ipairs(idx.classicDroppers and idx.classicDroppers[item] or {}) do
+    for _, d in ipairs(ClassicDroppers(item)) do
         if not seen[d.npc] then
             seen[d.npc] = true
             local chance, src = ChanceFor(d.npc, item)
@@ -929,11 +969,3 @@ SB.OnIndexReady = function()
     wipe(lootCache); wipe(instanceCache)
     if SB.OnDataChanged then SB.OnDataChanged() end
 end
-
--- Tell the player once when the live database is missing.
-SB.On("PLAYER_LOGIN", function()
-    SB.After(45, function()
-        if SB.QDB() then return end
-        SB.Print("|cffff8800no Questie database found.|r Spawns, quests and \"dropped by\" need Questie (or the QuestieDB addon). Tooltips still show Classic loot and abilities. Type |cffffd100/tits status|r for details.")
-    end)
-end)

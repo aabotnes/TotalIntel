@@ -6,11 +6,11 @@ An Adventure Guide for every mob and item in WoW: Forever. Hover a mob to see it
 
 ## Where the data comes from
 
-Total Intel follows the current version of Forever instead of shipping its own copy of the game data:
+Total Intel reads live sources first, so it follows the current version of Forever. It also carries a snapshot of Forever's NPC, quest and item data, so it works on its own when no Questie database is installed:
 
 | What | Where it comes from |
 |---|---|
-| NPCs, levels, spawn points, quests, who drops and sells each item, zones, instances | **Questie's database**, read live in the game: the QuestieDB addon, or the database built into Questie. It's updated along with Forever. |
+| NPCs, levels, spawn points, quests, who drops and sells each item, zones, instances | **Questie's database**, read live in the game when it's installed: the QuestieDB addon, or the database built into Questie. Otherwise the **bundled snapshot** of QuestieDB's Forever data. `/tits status` says which one is in use and how old the snapshot is. |
 | Which quests a mob is for | also the **game client**: the quest lines on a mob's tooltip carry quest IDs, so every mob you target or mouse over teaches Total Intel its quests, Forever-only ones included |
 | Item names, quality, item levels (Forever-only items included), spells, zone names | the **game client** |
 | Recipes: profession, skill, reagents, how it's learned | the **game client's profession window**: see [Crafting](#crafting) |
@@ -21,9 +21,10 @@ Total Intel follows the current version of Forever instead of shipping its own c
 
 ## Install
 
-1. Have **Questie** installed (or the QuestieDB addon). Total Intel reads its database. Without it, tooltips still show Classic loot and abilities, but spawns, quest lists and "dropped by" need it. `/tits status` shows which database was found.
-2. Unzip Total Intel into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`.
-3. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
+1. Unzip Total Intel into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`.
+2. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
+
+Nothing else is required. If you also run Questie (or the QuestieDB addon), Total Intel reads its database instead of the bundled snapshot, so new quests and NPCs show up as soon as Questie updates.
 
 ## Opening things
 
@@ -38,7 +39,7 @@ It's an open book, like the Adventure Guide:
 - **Left page:** a list. **Recent** (your recent targets), **Zone**, **Bestiary** (everything you've killed), search results, or an instance's bosses and inhabitants. Each mob has its portrait.
 - **Zone** lists every mob in the zone you're in, grouped: *For your quests* first, then *Bosses, elites & rares*, *Creatures* and *Friendly NPCs*. Mobs you've seen there are always included, even ones no database knows.
 - **Right page:** the mob, item or instance you picked, with the journal's tabs down the right edge.
-- **Search** (top right): any mob or item by name or ID.
+- **Search** (top right): any mob, NPC or item by name or ID, whether you've seen it or not. Results are grouped into *Mobs and NPCs* and *Items*. `/tits <name>` does the same from chat.
 - **Bottom tabs:** Recent, Zone, Bestiary, **Dungeons**, **Raids** and Settings. Dungeons and Raids show every instance as a tile with the Adventure Guide's artwork. Click one for its bosses, its other inhabitants and its boss loot.
 - **Back arrow** (top left) and the path next to it show where you are.
 - **Resize** the journal by dragging its bottom-right corner. It remembers the size.
@@ -97,7 +98,7 @@ Open them with `/tits options`, the Settings tab, or **Options → AddOns**. The
 | `/tits options` | settings |
 | `/tits link` | Wowhead link for your target |
 | `/tits learn` | turn recording kills, loot and spells on or off |
-| `/tits status` | which database was found, and what's loaded (handy for bug reports) |
+| `/tits status` | which database is in use, what's loaded, and any errors the addon caught (handy for bug reports) |
 | `/tits minimap` | hide or show the minimap button |
 
 `/totalintel` works too.
@@ -110,6 +111,6 @@ Open them with `/tits options`, the Settings tab, or **Options → AddOns**. The
 
 ## Data and license
 
-Total Intel is GPL-3.0. Its bundled Classic reference numbers are built from [CMaNGOS](https://github.com/cmangos) (GPL-3.0). See [tools/README.md](tools/README.md) to rebuild them. Live data comes from [QuestieDB](https://github.com/Questie/QuestieDB) and the game. Thanks to both projects.
+Total Intel is GPL-3.0. Its bundled data is built from [QuestieDB](https://github.com/Questie/QuestieDB) (the Forever snapshot) and [CMaNGOS](https://github.com/cmangos) (Classic reference numbers), both GPL-3.0. See [tools/README.md](tools/README.md) to rebuild it. Thanks to both projects.
 
 Total Intel is not affiliated with Wowhead or Blizzard.

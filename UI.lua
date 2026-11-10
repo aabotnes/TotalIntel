@@ -11,6 +11,7 @@ local WIDTH, HEIGHT = 980, 640          -- default size; drag the corner to resi
 local MIN_W, MIN_H, MAX_W, MAX_H = 800, 496, 1600, 1100
 local TOP = 69                          -- height of the title + navigation bar above the book
 local ui
+local DrawPage
 local state = { mode = "recent", page = nil, tab = "overview", history = {}, expanded = {} }
 
 ------------------------------------------------------------------------------
@@ -92,7 +93,7 @@ local function QuestState(id)
     if SB.QuestDone(id) then return "done", "good" end
     local q = SB.GetQuest(id)
     if q and not SB.QuestForMe(q) then return "not for you", "off" end
-    return nil, "text"
+    return nil, "light"
 end
 
 local function QuestTooltip(tt, row)
@@ -125,7 +126,7 @@ local function QuestRow(id, right, what)
 end
 
 local function Header(text, right) return { kind = "header", text = text, right = right } end
-local function Note(text, color) return { kind = "text", text = text, color = color or "dim" } end
+local function Note(text, color) return { kind = "text", text = text, color = color or "text" } end
 local function KV(key, value, color) return { kind = "kv", key = key, text = value, color = color } end
 
 local function FormatTime(t) return t and date("%d %b %Y, %H:%M", t) or "-" end
@@ -179,9 +180,18 @@ local function ListRows()
     local mode = state.mode
     if mode == "search" then
         local results = SB.Search(state.query or "")
-        title, count = "Search", #results
+        title, count = "Search: " .. (state.query or ""), #results
+        local npcs, items = {}, {}
         for _, r in ipairs(results) do
-            rows[#rows + 1] = r.kind == "npc" and NpcRow(r.id, "boss") or ItemRow(r.id)
+            if r.kind == "npc" then npcs[#npcs + 1] = NpcRow(r.id, "boss") else items[#items + 1] = ItemRow(r.id) end
+        end
+        if #npcs > 0 then
+            rows[#rows + 1] = Header("Mobs and NPCs", tostring(#npcs))
+            for _, r in ipairs(npcs) do rows[#rows + 1] = r end
+        end
+        if #items > 0 then
+            rows[#rows + 1] = Header("Items", tostring(#items))
+            for _, r in ipairs(items) do rows[#rows + 1] = r end
         end
         if #results == 0 then rows[1] = Note("Nothing found. Try part of the name, or an ID.") end
     elseif mode == "instance" then
@@ -233,8 +243,7 @@ local function ListRows()
         end
         if #rows == 0 then
             if not SB.QDB() then
-                rows[1] = Note("No mobs listed for " .. (label or "this zone") .. " yet.")
-                rows[2] = Note("The zone list needs Questie's database, and none was found. Type /tits status to see why. Until then it lists the mobs you target or mouse over here.")
+                rows[1] = Note("No mobs listed for " .. (label or "this zone") .. " yet. Type /tits status to see what's loaded.")
             else
                 rows[1] = Note(SB.index.ready and "No mobs known for this zone." or "Reading the database...")
             end
@@ -917,6 +926,7 @@ local function DrawHeader()
     if p.kind ~= "item" then Skin.Color(ui.rightTitle, "title") end
     ui.rightSub:SetText(sub)
     Skin.Color(ui.rightSub, "text")
+    ui.rightSubBg:SetShown(sub ~= "")
     ui.wowhead:SetShown(p.kind ~= "instance")
     ui.back:SetEnabled(#state.history > 0)
 end
@@ -1001,11 +1011,11 @@ local function GridRows(raid)
             end,
         }
     end
-    if #rows == 0 then rows[1] = Note(SB.index.ready and "No instances known. Is QuestieDB installed?" or "Reading the database...") end
+    if #rows == 0 then rows[1] = Note(SB.index.ready and "No instances known." or "Reading the database...") end
     return rows
 end
 
-local function DrawPage(keep)
+local function DrawPageNow(keep)
     if not ui then return end
     local mode = state.mode
     ui.nav:SetText(Breadcrumb())
@@ -1032,11 +1042,13 @@ local function DrawPage(keep)
         ui.rightTitle:SetText("Total Intel")
         Skin.Color(ui.rightTitle, "title")
         ui.rightSub:SetText("")
+        ui.rightSubBg:Hide()
         ui.wowhead:Hide(); ui.pin:Hide()
         ui.content:Show()
         ui.content:SetRows({
             Header("Welcome"),
-            { kind = "text", text = "Pick a mob on the left, search above, or open Dungeons and Raids below." },
+            { kind = "text", text = "Pick a mob on the left, or open Dungeons and Raids below." },
+            { kind = "text", text = "Search (top right) finds any mob, NPC or item by name or ID, whether you've seen it or not. /tits <name> does the same." },
             { kind = "text", text = "Alt-click any mob in the world, a nameplate, your target frame, or any item, to open it here." },
             { kind = "text", text = "Inside dungeons and raids the game hides which mob you're looking at from addons, so use the Dungeons and Raids pages there." },
         })
@@ -1073,6 +1085,18 @@ local function DrawPage(keep)
     end
     ui.content:Show()
     ui.content:SetRows(rows, keep)
+end
+
+-- A page that fails to draw is reported (once) instead of leaving a silent, half-empty window.
+local reported = {}
+function DrawPage(keep)
+    local ok, err = pcall(DrawPageNow, keep)
+    if ok then return end
+    SB.Error("window", err)
+    if not reported[tostring(err)] then
+        reported[tostring(err)] = true
+        SB.Print("|cffff5555couldn't draw this page.|r Type |cffffd100/tits status|r and send the error to the author.")
+    end
 end
 
 function SB.Redraw(keep) DrawPage(keep) end
@@ -1153,7 +1177,7 @@ local function CreateUI()
     ui.nav:SetJustifyH("LEFT")
     ui.nav:SetWordWrap(false)
 
-    ui.search = W.Input(ui, 220, "Search")
+    ui.search = W.Input(ui, 240, "Search mobs, NPCs and items")
     ui.search:SetPoint("TOPRIGHT", -20, -34)
     ui.search:SetScript("OnTextChanged", function(self, user)
         if not user then return end
@@ -1165,8 +1189,9 @@ local function CreateUI()
     end)
     ui.search:SetScript("OnEnterPressed", function(self)
         self:ClearFocus()
-        local first = ui.leftList.rows[1]
-        if first and first.onClick then first.onClick(first) end
+        for _, row in ipairs(ui.leftList.rows) do
+            if row.onClick then row.onClick(row) break end
+        end
     end)
 
     -- the open book
@@ -1221,7 +1246,10 @@ local function CreateUI()
     ui.rightSub:SetPoint("TOPLEFT", 34, -60)
     ui.rightSub:SetPoint("RIGHT", -24, 0)
     ui.rightSub:SetJustifyH("LEFT")
-    ui.rightSub:SetMaxLines(2)
+    ui.rightSub:SetMaxLines(1)
+    ui.rightSubBg = Skin.Paper(right, "BACKGROUND", 4)
+    ui.rightSubBg:SetPoint("TOPLEFT", ui.rightSub, "TOPLEFT", -6, 4)
+    ui.rightSubBg:SetPoint("BOTTOMRIGHT", ui.rightSub, "BOTTOMRIGHT", 6, -4)
     ui.wowhead = Button(right, "Wowhead", 92, 22, function()
         local p = state.page
         if p then SB.ShowLink(p.kind, p.id, p.kind == "npc" and SB.NpcName(p.id) or SB.GetItem(p.id).name) end
@@ -1287,12 +1315,15 @@ local function CreateUI()
     nt:SetPoint("LEFT", 12, 0)
     nt:SetText("Your notes (saved for all your characters)")
     local scroll = W.Scroll(notes)
-    scroll:SetPoint("TOPLEFT", 4, -34)
-    scroll:SetPoint("BOTTOMRIGHT")
+    scroll:SetPoint("TOPLEFT", 8, -36)
+    scroll:SetPoint("BOTTOMRIGHT", 0, 6)
+    local paper = Skin.Paper(notes)
+    paper:SetPoint("TOPLEFT", 0, -30)
+    paper:SetPoint("BOTTOMRIGHT")
     local eb = CreateFrame("EditBox", nil, scroll.child)
     eb:SetMultiLine(true)
     eb:SetAutoFocus(false)
-    eb:SetFontObject(W.Font("GameFontBlack", "ChatFontNormal"))
+    eb:SetFontObject(W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "ChatFontNormal")))
     eb:SetWidth(340)
     eb:SetPoint("TOPLEFT")
     eb:SetMaxLetters(2000)
@@ -1511,8 +1542,12 @@ function SB.OpenSearch(text)
     ui.search:SetText(text)
     ui:Show()
     DrawPage()
-    local rows = ui.leftList.rows
-    if #rows == 1 and rows[1].onClick then rows[1].onClick(rows[1]) end
+    -- a single match opens straight away
+    local only, n = nil, 0
+    for _, row in ipairs(ui.leftList.rows) do
+        if row.onClick then only, n = row, n + 1 end
+    end
+    if n == 1 then only.onClick(only) end
 end
 
 function SB.OpenSettings()
