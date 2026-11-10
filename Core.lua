@@ -34,11 +34,13 @@ SB.DEFAULTS = {
         itemDroppedBy = true,
         itemDroppedByCount = 3,
         itemQuests = true,
+        itemCrafted = true,
         itemVendors = true,
         itemYourLoot = true,
     },
     wowhead = "forever",        -- forever | classic
-    itemClick = "ALT",          -- modifier+click on an item opens its page: ALT, CTRL-ALT, SHIFT-ALT, NONE
+    style = "journal",          -- journal (Adventure Guide art) | dark
+    itemClick = "ALT",          -- modifier+click on an item or mob opens its page: ALT, CTRL-ALT, SHIFT-ALT, NONE
     learn = true,               -- record kills, loot and spells you see
     minimap = { angle = 215, hide = false },
     mobs = {},
@@ -112,7 +114,8 @@ end
 
 function SB.Percent(chance)
     if not chance then return "?" end
-    if chance >= 10 then return ("%d%%"):format(chance + 0.5) end
+    if chance <= 0 then return "0%" end
+    if chance >= 10 then return (("%.1f"):format(chance):gsub("%.0$", "")) .. "%" end
     if chance >= 1 then return ("%.1f%%"):format(chance) end
     if chance >= 0.1 then return ("%.2f%%"):format(chance) end
     return "<0.1%"
@@ -208,6 +211,7 @@ local HELP = {
     "|cffffd100/tits|r - open the window on your target (or the last mob you viewed)",
     "|cffffd100/tits <name>|r - search mobs and items, e.g. |cffffd100/tits hogger|r",
     "|cffffd100/tits zone|r - mobs in your zone or instance",
+    "|cffffd100/tits dungeons|r, |cffffd100/tits raids|r - the instance journal",
     "|cffffd100/tits options|r - tooltip and window settings",
     "|cffffd100/tits link|r - Wowhead link for your target",
     "|cffffd100/tits minimap|r - hide or show the minimap button",
@@ -227,6 +231,10 @@ local function Slash(msg)
         SB.OpenSettings()
     elseif cmd == "zone" then
         SB.OpenZone()
+    elseif cmd == "dungeons" or cmd == "dungeon" then
+        SB.OpenDungeons(false)
+    elseif cmd == "raids" or cmd == "raid" then
+        SB.OpenDungeons(true)
     elseif cmd == "link" or cmd == "wowhead" then
         local id = SB.UnitNpcId("target")
         if id then SB.ShowLink("npc", id, SB.NpcName(id)) else SB.Print("target a mob first.") end

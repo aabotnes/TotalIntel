@@ -2,5 +2,6 @@
 tests/ export-ignore
 tools/ export-ignore
 .pkgmeta export-ignore
+dist/ export-ignore
 .gitattributes export-ignore
 .github/ export-ignore

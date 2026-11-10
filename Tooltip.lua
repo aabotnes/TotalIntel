@@ -168,7 +168,7 @@ function SB.AddNpcLines(tt, id, unit)
     end
 
     if shown and o.hint then
-        Add(tt, "/tits or the keybind for the full bestiary page", { 0.45, 0.45, 0.45 })
+        Add(tt, "Alt-click it or type /tits for the full page", { 0.45, 0.45, 0.45 })
     end
 end
 
@@ -205,6 +205,15 @@ function SB.AddItemLines(tt, id)
             end
         end
         if others > 2 then Add(tt, "  + " .. SB.Plural(others - 2, "more quest"), GREY) end
+    end
+
+    if o.itemCrafted ~= false then
+        for i, r in ipairs(SB.Crafting.ForItem(id)) do
+            if i > 2 then break end
+            local text = "|cffffd100Crafted:|r " .. (r.profession or "?") .. (r.skill and (" (" .. r.skill .. ")") or "")
+            local who = #r.known > 0 and (#r.known == 1 and r.known[1] or (#r.known .. " of your characters")) or nil
+            AddDouble(tt, text, who and ("|cff40c040" .. who .. "|r") or "", nil, GREY)
+        end
     end
 
     if o.itemDroppedBy then

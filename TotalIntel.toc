@@ -1,23 +1,21 @@
 ## Interface: 16001
 ## Title: Total Intel on Targets & Spoils (TITS)
-## Notes: |cffc27dff[Soeta's]|r Loot tables, drop chances, abilities and quest info for every mob, on tooltips and in a window. /tits
+## Notes: |cffc27dff[Soeta's]|r An Adventure Guide for every mob and item: loot and drop chances, abilities, quests and recipes, on tooltips and in a journal. /tits
 ## Author: Soeta
-## Version: 1.0.0
+## Version: 2.0.0
 ## IconTexture: Interface\Icons\Ability_Physical_Taunt
 ## SavedVariables: TotalIntelDB
+## OptionalDeps: QuestieDB
 ## X-License: GPL-3.0
 
 Core.lua
-Data\Npcs.lua
+Data\Classic.lua
 Data\Loot.lua
 Data\LootExtra.lua
 Data\Spells.lua
-Data\Items.lua
-Data\DroppedBy.lua
-Data\ItemQuests.lua
-Data\Quests.lua
-Data\Zones.lua
+Skin.lua
 Database.lua
+Professions.lua
 Quests.lua
 Tracker.lua
 Tooltip.lua

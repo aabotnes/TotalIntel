@@ -64,7 +64,13 @@ local function SeeUnit(unit, recent)
     local id = SB.UnitNpcId(unit)
     if not id then return end
     if UnitIsPlayer(unit) or (UnitPlayerControlled and UnitPlayerControlled(unit)) then return end
-    Touch(id)
+    local m = Touch(id)
+    -- remember its name and level for mobs the database doesn't know
+    local name = SB.Public(UnitName(unit))
+    if name then m.name = name end
+    local lv = SB.Public(UnitLevel(unit))
+    if lv and lv > 0 then m.lv = lv end
+    if SB.ForgetNpc then SB.ForgetNpc(id) end
     if recent then
         SB.AddRecent(id)
         SB.lastTarget = id
@@ -127,29 +133,11 @@ local function AddKill(guid)
 end
 SB.AddKill = AddKill
 
-local function Mine(guid)
-    guid = Public(guid)
-    if not guid then return false end
-    if guid == UnitGUID("player") or guid == UnitGUID("pet") then return true end
-    if IsInGroup and IsInGroup() then
-        local prefix, n = IsInRaid() and "raid" or "party", GetNumGroupMembers()
-        for i = 1, n do
-            if guid == UnitGUID(prefix .. i) or guid == UnitGUID(prefix .. "pet" .. i) then return true end
-        end
-    end
-    return false
-end
-
--- The combat log, where the client still gives it to addons.
--- (Registering is wrapped in pcall by SB.On: clients that withhold the combat log just skip this.)
-SB.On("COMBAT_LOG_EVENT_UNFILTERED", function()
-    if not SB.db or not SB.db.learn or not CombatLogGetCurrentEventInfo then return end
-    local _, sub, _, sourceGUID, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
-    sub = Public(sub)
-    if sub == "PARTY_KILL" and Mine(sourceGUID) then AddKill(Public(destGUID)) end
-end)
-
--- Fallback without the combat log: a mob you (or your group) tagged is seen dead.
+-- WoW: Forever restricts the combat log (COMBAT_LOG_EVENT_UNFILTERED) to Blizzard's own UI;
+-- registering it pops up "blocked from an action only available to the Blizzard UI". So kills
+-- are counted from what addons may see: a mob you fought dying on your target or nameplates,
+-- and looting its corpse.
+-- A mob you (or your group) tagged is seen dead.
 local function CheckDead(unit)
     if not SB.db or not SB.db.learn or not UnitExists(unit) then return end
     if not UnitIsDead(unit) or UnitIsPlayer(unit) then return end

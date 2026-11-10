@@ -2,101 +2,107 @@
 
 *by Soeta* · `/tits`
 
-Wowhead in your game. Hover a mob to see its best drops with their drop chance, its abilities, and the quests you need it for, with your progress. Open the bestiary window for its full loot table, abilities, quests, where it spawns, and everything you've killed, looted and seen it cast yourself. It's made for WoW: Forever (interface 16001).
+An Adventure Guide for every mob and item in WoW: Forever. Hover a mob to see its best drops, its abilities and the quests you need it for. Alt-click any mob or item to open its page in a journal styled like the game's own Adventure Guide. There you'll find loot with drop chances, abilities, quests, where it spawns, how an item is crafted, and everything you've killed, looted and seen yourself.
 
-The game doesn't let addons go online, so the database ships inside the addon (about 10,000 mobs, 15,000 items and 4,000 quests). Your own kills and loot are added as you play.
+## Where the data comes from
+
+Total Intel follows the current version of Forever instead of shipping its own copy of the game data:
+
+| What | Where it comes from |
+|---|---|
+| NPCs, levels, spawn points, quests, who drops and sells each item, zones, instances | **QuestieDB**, read live in the game. It's the database addon behind Questie and is updated along with Forever. |
+| Item names, quality, item levels (Forever-only items included), spells, zone names | the **game client** |
+| Recipes: profession, skill, reagents, how it's learned | the **game client's profession window**: see [Crafting](#crafting) |
+| Dungeon and raid artwork and lore | the game's **Adventure Guide** |
+| Drop chances for quest items | Wowhead's rates, shipped by QuestieDB |
+| Other drop chances, mob health, abilities | **Classic reference numbers** (CMaNGOS), bundled because nothing in the game provides them. They're labeled *Classic*. Your own looted rate is shown next to every chance. |
 
 ## Install
 
-Download the addon and unzip it into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`. The folder must be named exactly `TotalIntel`. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
+1. Install **QuestieDB** (it comes with Questie). Without it, tooltips still show Classic loot and abilities, but spawns, quests and "dropped by" need it.
+2. Unzip Total Intel into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`.
+3. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
+
+## Opening things
+
+- **Alt-click** a mob in the world, a nameplate, your target or focus frame, or any item (bags, loot, chat links, character sheet) to open its page. You can change the key in the settings.
+- `/tits` opens the journal on your target. Inside a dungeon or raid it opens that instance's page.
+- Key bindings: *Open for target*, *Open for mouseover*, *Toggle window*.
+
+## The journal
+
+It's an open book, like the Adventure Guide:
+
+- **Left page:** a list. **Recent** (your recent targets), **Zone** (every mob in your zone, bosses first), **Bestiary** (everything you've killed), search results, or an instance's bosses and inhabitants. Each mob has its portrait.
+- **Right page:** the mob, item or instance you picked, with the journal's tabs down the right edge.
+- **Search** (top right): any mob or item by name or ID.
+- **Bottom tabs:** Recent, Zone, Bestiary, **Dungeons**, **Raids** and Settings. Dungeons and Raids show every instance as a tile with the Adventure Guide's artwork. Click one for its bosses, its other inhabitants and its boss loot.
+- **Back arrow** (top left) and the path next to it show where you are.
+
+**Mob tabs**
+- **Overview:** type, health, mana, coin, services, where it spawns (click a zone for a map pin), your record, and its best drops.
+- **Loot:** every drop with its chance and where the chance comes from, next to *your* rate on Forever (e.g. *you 3 of 12 (25%)*). It also lists skinning and pickpocket loot, and items you've looted that no database lists.
+- **Abilities:** Adventure Guide-style ability headers. Click one for its description. Spells you see a mob cast are added, with how often.
+- **Model:** the mob in 3D. Drag to turn it.
+- **Quests:** on your quests (with progress), needed for, starts, and turn in here.
+- **Notes:** your own notes, saved for all your characters.
+
+**Item tabs:** Overview, **Dropped by** (every mob, no "+23 more"), **Crafted**, **Quests** and **Sold by** (every vendor).
+
+**Instance tabs:** Overview (Adventure Guide lore, level range, bosses) and Loot (each boss's drops).
+
+**Wowhead link** shows the page's Wowhead link, ready to copy with Ctrl+C, because the game can't open a browser.
+
+## Crafting
+
+Recipes come straight from the game client. Whenever a profession window opens, Total Intel reads every recipe in it with the client's profession API: what it makes, the reagents, the profession, how it's learned (e.g. *Requires Tailoring (165)*) and when it turns grey. That includes:
+
+- your own professions, on any character
+- someone else's profession link in chat. Click their **[Tailoring]** link and their whole recipe list is read.
+
+Recipes are saved for your whole account and read again each time a window opens, so they stay current with Forever's patches. A crafted item's page then opens on its **Crafted** tab, with the profession, skill, reagents and which of your characters know the recipe. Its tooltip says *Crafted: Tailoring (165)*. Reagents also list what they're used in.
 
 ## Tooltips
 
-Hover any mob in the world:
+**Mobs:** type and rank, your quests that need it (with progress), quests it gives and turn-ins, notable drops with chances, abilities, and your kills.
 
-- **Type and rank**: *Elite · Humanoid*, *Beast · Wolf · Skinnable*, and *Pickpocket* for rogues.
-- **Your quests**: every quest in your log where you kill this mob or loot something from it, with your progress, e.g. *Wanted: "Hogger" · Huge Gnoll Claw 100% 0/1*.
-- **Quest giver**: quests the NPC starts that you can still do, and *Turn in* lines for quests in your log.
-- **Notable drops**: its best drops with their drop chance. Quest drops always show. Once you've looted it 5 times, your own count shows next to each drop, e.g. *you 2/12*.
-- **Abilities**: the spells it casts, with icons.
-- **You**: how many you've killed and looted.
+**Items:** quests that need it, the quest it starts, how it's crafted, the mobs most likely to drop it, a vendor, and the mob you've looted it from most.
 
-Hover an item to see the quests that need it (with progress), the quest it starts, the mobs with the best chance to drop it, a vendor that sells it, and the mob you've looted it from most.
-
-Every line can be turned on or off. You can also show the lines only while Shift, Ctrl or Alt is held. See [Settings](#settings).
-
-## The window (`/tits`)
-
-`/tits` opens the window on your target. On the left:
-
-- **Recent**: mobs you've targeted lately.
-- **Zone**: every mob in your zone, with bosses first. Inside a dungeon or raid, it lists that instance's mobs and bosses.
-- **Bestiary**: every mob you've killed, most kills first.
-- **Search**: type part of a name, or an ID, to find any mob or item.
-
-A mob's page shows its 3D model and five tabs:
-
-- **Overview**: level, rank, type, health, mana, coin, services (vendor, trainer, flight master), where it spawns, your record (kills, corpses looted, first and last seen), and its best drops. Click a zone to put a pin on the map at its spawns.
-- **Loot**: the whole loot table with each item's drop chance next to *your* rate on Forever, e.g. *3 (25%)* of 12 corpses. Also items you've looted that the database doesn't list, and skinning and pickpocket loot.
-- **Abilities**: the spells it casts, with full spell tooltips and how many times you've seen each. Spells you see a mob cast are added, even if the database doesn't list them.
-- **Quests**: on your quests (with progress), needed for, starts, turn in here.
-- **Notes**: your own notes on the mob, saved for all your characters.
-
-Items have pages too: **Overview**, **Dropped by** (every mob, with chances and your own counts), **Quests**, and **Sold by**.
-
-Click an item or mob anywhere in the window to open its page, and **< Back** to go back. Shift-click an item or spell to link it in chat.
-
-**Wowhead link**: the game can't open a browser, so this shows the mob's, item's, quest's or spell's Wowhead link, ready to copy with Ctrl+C. Choose *wowhead.com/forever* or */classic* in the settings.
-
-**Alt-click** an item in your bags, the loot window or a chat link to open its page. You can change this in the settings.
+Every line can be turned off, or shown only while Shift, Ctrl or Alt is held.
 
 ## Settings
 
-Open the settings with `/tits options`, the **Settings** button in the window, right-click on the minimap button, or the game's **Options → AddOns → Total Intel on Targets & Spoils**.
+Open them with `/tits options`, the Settings tab, or **Options → AddOns**. They're on two pages: mob tooltips on the left, item tooltips and general settings on the right.
 
-**Mob tooltips**
-- Add Total Intel lines to tooltips, either always or only while Shift, Ctrl or Alt is held
-- Type, rank and skinning
-- Your quests that need it
-- Quests it gives and turn-ins
-- Notable drops: how many (1-10) and the lowest quality worth showing
-- Abilities: how many (1-10)
-- Your kills and loot
-- Health and mana, coin it drops, NPC ID, the hint line
+- Each tooltip line on or off, how many drops and abilities to list, and the lowest quality worth showing.
+- **Window style:** Adventure Guide (parchment) or Dark.
+- **Open with:** Alt-click, Ctrl+Alt-click, Shift+Alt-click, or off.
+- **Wowhead links:** wowhead.com/forever or /classic.
+- Record kills, loot and spells. Minimap button. Reset tooltips. Forget my bestiary.
 
-**Item tooltips**
-- Quests that use it, dropped by (how many mobs to list), sold by, where you looted it, item ID
-
-**General**
-- Which Wowhead the links point to
-- The click that opens an item's page (Alt, Ctrl+Alt or Shift+Alt, or off)
-- Record kills, loot and spells
-- Minimap button
-- Reset tooltip settings, and *Forget my bestiary* to wipe what you've recorded
-
-## Commands and key bindings
+## Commands
 
 | Command | What it does |
 |---|---|
-| `/tits` | open the window on your target |
+| `/tits` | open the journal on your target (or your instance) |
 | `/tits <name>` | search mobs and items, e.g. `/tits hogger`. A single match opens straight away. |
 | `/tits zone` | mobs in your zone or instance |
+| `/tits dungeons`, `/tits raids` | the instance journal |
 | `/tits options` | settings |
 | `/tits link` | Wowhead link for your target |
 | `/tits learn` | turn recording kills, loot and spells on or off |
 | `/tits minimap` | hide or show the minimap button |
 
-`/totalintel` works too. Under **Key Bindings → AddOns** you can bind *Open for target*, *Open for mouseover* and *Toggle window*.
+`/totalintel` works too.
 
 ## Good to know
 
-- **Drop chances are Classic numbers.** They come from the CMaNGOS Classic database, because Forever doesn't have published drop rates yet. Forever's own data decides *which* mobs drop *which* items. If Forever lists a drop that Classic doesn't have, it's marked *Forever*, with no chance. That's why the window shows your own rate next to every chance.
-- **Dungeons and raids:** inside instances, Forever hides from addons which mob a tooltip belongs to. Mob tooltips there have no extra lines, and the game won't tell the addon who your target is. Use the **Zone** list instead: it lists the instance's bosses and mobs. Open-world mobs work normally, even in combat.
-- **What it records:** kills (yours and your group's), every corpse you loot and what was on it, skinning, mining and herbing loot, pickpocketing (while stealthed), and spells mobs cast near you. It's saved for your whole account. Turn it off with `/tits learn`.
-- **New in Forever:** a mob or quest that isn't in the database still gets a page, and still records your kills, loot and spells. Quests not in the database are still matched to mobs by name.
+- **Dungeons and raids:** inside instances, Forever hides from addons which mob a tooltip or your target is. Mob tooltips there get no extra lines, and the target can't be identified. Use the instance's page instead: `/tits` opens it.
+- **Kills** are counted when a mob you fought dies on your target or nameplates, and when you loot its corpse. Forever reserves the combat log for Blizzard's own UI, so addons can't use it.
+- **What's recorded:** kills, every corpse you loot and what was on it, skinning, mining and herbing loot, pickpocketing (while stealthed), spells mobs cast near you, mobs' names and levels, and recipes. It's all saved for your whole account. Turn recording off with `/tits learn`.
 
 ## Data and license
 
-Total Intel is GPL-3.0. Its database is built from [QuestieDB](https://github.com/Questie/QuestieDB) (WoW: Forever NPCs, quests, items and zones) and [CMaNGOS](https://github.com/cmangos) (drop chances, stats, spell lists and boss scripts), both GPL-3.0. Thanks to both projects. See [tools/README.md](tools/README.md) to rebuild it.
+Total Intel is GPL-3.0. Its bundled Classic reference numbers are built from [CMaNGOS](https://github.com/cmangos) (GPL-3.0). See [tools/README.md](tools/README.md) to rebuild them. Live data comes from [QuestieDB](https://github.com/Questie/QuestieDB) and the game. Thanks to both projects.
 
 Total Intel is not affiliated with Wowhead or Blizzard.

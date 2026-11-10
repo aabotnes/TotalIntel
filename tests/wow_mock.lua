@@ -54,6 +54,11 @@ function CreateFrame(kind, name, parent, template)
     return w
 end
 
+function M.registered(ev)
+    for _, fr in ipairs(M.frames) do if fr._events[ev] then return true end end
+    return false
+end
+
 function M.Fire(ev, ...)
     for _, fr in ipairs(M.frames) do
         if fr._events[ev] and fr._scripts.OnEvent then fr._scripts.OnEvent(fr, ev, ...) end
@@ -167,7 +172,8 @@ function GetLootSourceInfo(i) return unpack(M.loot[i].sources) end
 
 C_Spell = { GetSpellInfo = function(id) return { name = "Spell" .. id, iconID = 136000 + (id % 100) } end }
 C_Item = { GetItemInfo = function() return nil end, GetItemIconByID = function(id) return 130000 + (id % 1000) end }
-C_Map = { GetBestMapForUnit = function() return 1429 end, GetMapInfo = function() return { name = "Elwynn Forest" } end }
+C_Map = { GetBestMapForUnit = function() return 1429 end, GetMapInfo = function() return { name = "Elwynn Forest" } end,
+          GetAreaInfo = function(a) return ({ [12] = "Elwynn Forest", [1519] = "Stormwind City" })[a] end }
 
 function M.Load(dir, files)
     local SB = {}

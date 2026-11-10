@@ -1,14 +1,14 @@
--- Reads the bundled database (Data/*.lua). Records are compact strings, decoded on first use
--- and cached, so the data costs little memory until you actually look something up.
+-- Where Total Intel's facts come from. Everything about WoW: Forever itself is read live:
+--   * QuestieDB (LibQuestieDB): NPCs, levels, spawns, quests, who drops and sells each item,
+--     zones and instances. It is updated along with Forever, so Total Intel follows it.
+--   * The game client: item names, quality and levels (hotfixes included), spells, the
+--     Adventure Guide, and recipes (Professions.lua).
+-- Only Classic reference numbers that no live source has are bundled (Data/*.lua, CMaNGOS):
+-- drop chances, health, mana, coin, creature type, abilities, display IDs.
 
 local _, SB = ...
 local D = SB.D
 local Fields, List = SB.Fields, SB.List
-
--- NPC record fields (tools/build_data.py writes them in this order)
-local N_NAME, N_SUB, N_MINL, N_MAXL, N_RANK, N_TYPE, N_FAMILY, N_HPMIN, N_HPMAX, N_MANA, N_GOLDMIN, N_GOLDMAX,
-      N_FLAGS, N_ZONES, N_FRIENDLY, N_STARTS, N_ENDS, N_KILLFOR, N_DROPFOR, N_WORLD, N_CLASSIC, N_DISPLAY = 1, 2, 3, 4,
-      5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22
 
 SB.RANKS = { [0] = "Normal", [1] = "Elite", [2] = "Rare Elite", [3] = "Boss", [4] = "Rare" }
 SB.TYPES = { [1] = "Beast", [2] = "Dragonkin", [3] = "Demon", [4] = "Elemental", [5] = "Giant", [6] = "Undead",
@@ -20,95 +20,440 @@ SB.FAMILIES = { [1] = "Wolf", [2] = "Cat", [3] = "Spider", [4] = "Bear", [5] = "
 SB.QUALITY_HEX = { [0] = "9d9d9d", [1] = "ffffff", [2] = "1eff00", [3] = "0070dd", [4] = "a335ee", [5] = "ff8000",
     [6] = "e6cc80", [7] = "00ccff" }
 SB.QUALITY_NAMES = { [0] = "Poor", [1] = "Common", [2] = "Uncommon", [3] = "Rare", [4] = "Epic", [5] = "Legendary" }
+SB.RAID_MAPS = { [409] = true, [249] = true, [469] = true, [309] = true, [509] = true, [531] = true, [533] = true }
 
-local npcCache, lootCache, itemCache, questCache = {}, {}, {}, {}
+------------------------------------------------------------------------------
+-- QuestieDB
+------------------------------------------------------------------------------
+
+local LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates
+local checked = false
+
+-- The live database, if the QuestieDB addon is installed (and recent enough).
+function SB.QDB()
+    if checked then return LQ end
+    checked = true
+    local lib = _G.LibQuestieDB
+    if type(lib) ~= "table" or not lib.Npc then return nil end
+    if lib.RequireContract then
+        local ok, res = pcall(lib.RequireContract, 1)
+        if not ok or res == false then return nil end
+    end
+    LQ, NpcDB, ItemDB, QuestDB = lib, lib.Npc, lib.Item, lib.Quest
+    if lib.Support and lib.Support.Get then
+        local ok, z = pcall(lib.Support.Get, "ZoneDB")
+        if ok then ZoneDB = z end
+    end
+    return LQ
+end
+
+-- Forgets QuestieDB lookups (used by the tests to swap databases).
+function SB.ResetSources()
+    checked, LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates = false, nil, nil, nil, nil, nil, nil
+    SB.ResetCaches()
+end
+
+local function Get(entity, id, key)
+    if not entity or not id then return nil end
+    local ok, v = pcall(entity.Get, id, key)
+    if ok then return v end
+end
+local function N(id, key) SB.QDB() return Get(NpcDB, id, key) end
+local function I(id, key) SB.QDB() return Get(ItemDB, id, key) end
+local function Q(id, key) SB.QDB() return Get(QuestDB, id, key) end
+
+local function AllIds(entity)
+    if not entity or not entity.GetAllIds then return {} end
+    local ok, ids = pcall(entity.GetAllIds)
+    return ok and ids or {}
+end
+
+-- Wowhead drop rates for quest items, shipped by QuestieDB: item -> { [npc] = percent }
+local function WowheadRates()
+    if DropRates ~= nil then return DropRates or nil end
+    DropRates = false
+    SB.QDB()
+    if not (LQ and LQ.Support and LQ.Support.Get) then return nil end
+    local ok, mod = pcall(LQ.Support.Get, "QuestieClassicItemDrops")
+    if ok and type(mod) == "table" and type(mod.wowheadData) == "string" then
+        local fn = loadstring(mod.wowheadData)
+        local ok2, data = pcall(fn or error)
+        if ok2 and type(data) == "table" then DropRates = data end
+    elseif ok and type(mod) == "table" and type(mod.wowheadData) == "table" then
+        DropRates = mod.wowheadData
+    end
+    return DropRates or nil
+end
+
+------------------------------------------------------------------------------
+-- Classic reference numbers (bundled)
+------------------------------------------------------------------------------
+
+local cmCache = {}
+local function Classic(id)
+    local c = cmCache[id]
+    if c ~= nil then return c or nil end
+    local raw = D.cm and D.cm[id]
+    if not raw then cmCache[id] = false return nil end
+    local f = Fields(raw)
+    c = { rank = tonumber(f[1]) or 0, type = tonumber(f[2]) or 0, family = tonumber(f[3]) or 0,
+          hpMin = tonumber(f[4]) or 0, hpMax = tonumber(f[5]) or 0, mana = tonumber(f[6]) or 0,
+          goldMin = tonumber(f[7]) or 0, goldMax = tonumber(f[8]) or 0, flags = f[9] or "",
+          display = tonumber(f[10]) or 0, worldDrops = tonumber(f[11]) or 0, map = tonumber(f[12]) or 0 }
+    cmCache[id] = c
+    return c
+end
+SB.Classic = Classic
+
+local function ParseLoot(s)
+    local out = {}
+    for _, e in ipairs(List(s)) do
+        local item, chance, q = strsplit(":", e)
+        out[#out + 1] = { item = tonumber(item), chance = tonumber(chance), quest = q == "q", src = "classic" }
+    end
+    return out
+end
+
+------------------------------------------------------------------------------
+-- Zones and instances (from QuestieDB's ZoneDB, names from the client)
+------------------------------------------------------------------------------
+
+local uiMapOf, areasOfUiMap, dungeonParent, dungeonName
+local function ZoneTables()
+    if uiMapOf then return end
+    uiMapOf, areasOfUiMap, dungeonParent, dungeonName = {}, {}, {}, {}
+    SB.QDB()
+    local priv = ZoneDB and ZoneDB.private or {}
+    for _, key in ipairs({ "areaIdToUiMapId", "areaIdToUiMapIdOverride" }) do
+        local src = priv[key]
+        local t = type(src) == "string" and select(2, pcall(loadstring(src) or error)) or src
+        if type(t) == "table" then
+            for area, ui in pairs(t) do
+                if type(ui) == "number" and ui > 0 then uiMapOf[area] = ui else uiMapOf[area] = nil end
+            end
+        end
+    end
+    for area, ui in pairs(uiMapOf) do
+        areasOfUiMap[ui] = areasOfUiMap[ui] or {}
+        areasOfUiMap[ui][area] = true
+    end
+    for area, d in pairs(type(priv.dungeons) == "table" and priv.dungeons or {}) do
+        dungeonName[area] = d[1]
+        for _, alt in ipairs(type(d[2]) == "table" and d[2] or {}) do dungeonParent[alt] = area end
+    end
+end
+
+function SB.UiMapForArea(area)
+    ZoneTables()
+    return uiMapOf[area]
+end
+
+function SB.ZoneName(area)
+    area = tonumber(area)
+    if not area or area == 0 then return "Unknown" end
+    ZoneTables()
+    area = dungeonParent[area] or area
+    if dungeonName[area] then return dungeonName[area] end
+    if C_Map and C_Map.GetAreaInfo then
+        local ok, name = pcall(C_Map.GetAreaInfo, area)
+        if ok and type(name) == "string" and name ~= "" then return name end
+    end
+    return "Zone #" .. area
+end
+
+local function InstanceAreaTable()
+    SB.QDB()
+    return ZoneDB and type(ZoneDB.instanceIdToAreaId) == "table" and ZoneDB.instanceIdToAreaId or {}
+end
+
+function SB.InstanceAreas(mapID)
+    local area = InstanceAreaTable()[mapID]
+    if not area then return nil end
+    ZoneTables()
+    local areas = { [area] = true }
+    for alt, parent in pairs(dungeonParent) do if parent == area then areas[alt] = true end end
+    return areas, area
+end
+
+-- The areas for where the player is now, and a label for them.
+function SB.PlayerAreas()
+    local mapID = SB.CurrentInstance()
+    if mapID then
+        local areas, area = SB.InstanceAreas(mapID)
+        return areas, (GetInstanceInfo and GetInstanceInfo()) or SB.ZoneName(area), mapID
+    end
+    ZoneTables()
+    local ui = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    local areas = {}
+    if ui and areasOfUiMap[ui] then for a in pairs(areasOfUiMap[ui]) do areas[a] = true end end
+    local info = ui and C_Map.GetMapInfo and C_Map.GetMapInfo(ui)
+    return areas, info and info.name or (GetZoneText and GetZoneText()) or "?"
+end
+
+function SB.CurrentInstance()
+    if not (IsInInstance and IsInInstance()) or not GetInstanceInfo then return nil end
+    local mapID = select(8, GetInstanceInfo())
+    if mapID and InstanceAreaTable()[mapID] then return mapID end
+end
+
+------------------------------------------------------------------------------
+-- Background indexes: the reverse lookups no single getter answers
+------------------------------------------------------------------------------
+
+local idx = {}
+SB.index = idx
+
+local function Add(t, k, v)
+    local l = t[k]
+    if not l then l = {}; t[k] = l end
+    l[#l + 1] = v
+end
+
+-- steps yield between batches when run as a coroutine
+local function Build(yield)
+    local count = 0
+    local function Tick()
+        count = count + 1
+        if yield and count % 150 == 0 then coroutine.yield() end
+    end
+    local n = {
+        classicDroppers = {}, -- item -> { {npc, chance, quest} } from the Classic loot tables
+        foreverItems = {},     -- npc  -> { item, ... } from QuestieDB's npcDrops
+        npcsInArea = {},       -- area -> { npc, ... }
+        killFor = {},          -- npc  -> { quest, ... }
+        itemFor = {},          -- item -> { quest, ... } (quest objectives and required items)
+    }
+    for npc, raw in pairs(D.loot or {}) do
+        for item, chance, q in raw:gmatch("(%d+):([%d.]+):?(q?)") do
+            Add(n.classicDroppers, tonumber(item), { npc = npc, chance = tonumber(chance), quest = q == "q" })
+        end
+        Tick()
+    end
+    n.classicChance = {}       -- item -> { [npc] = chance }
+    for item, list in pairs(n.classicDroppers) do
+        table.sort(list, function(a, b) return a.chance > b.chance end)
+        local t = {}
+        for _, d in ipairs(list) do t[d.npc] = d.chance end
+        n.classicChance[item] = t
+    end
+    if SB.QDB() then
+        for _, item in ipairs(AllIds(ItemDB)) do
+            for _, npc in ipairs(I(item, "npcDrops") or {}) do Add(n.foreverItems, npc, item) end
+            Tick()
+        end
+        for _, npc in ipairs(AllIds(NpcDB)) do
+            local spawns = N(npc, "spawns")
+            local any = false
+            if type(spawns) == "table" then
+                for area in pairs(spawns) do Add(n.npcsInArea, area, npc); any = true end
+            end
+            if not any then
+                local z = N(npc, "zoneID")
+                if z and z ~= 0 then Add(n.npcsInArea, z, npc); any = true end
+            end
+            if not any then
+                local c = Classic(npc)
+                local area = c and c.map > 0 and InstanceAreaTable()[c.map]
+                if area then Add(n.npcsInArea, area, npc) end
+            end
+            Tick()
+        end
+        for _, q in ipairs(AllIds(QuestDB)) do
+            local o = Q(q, "objectives") or {}
+            for _, c in ipairs(o[1] or {}) do if c[1] then Add(n.killFor, c[1], q) end end
+            for _, kc in ipairs(o[5] or {}) do
+                for _, c in ipairs(kc[1] or {}) do Add(n.killFor, c, q) end
+                if kc[2] then Add(n.killFor, kc[2], q) end
+            end
+            for _, it in ipairs(o[3] or {}) do if it[1] then Add(n.itemFor, it[1], q) end end
+            for _, it in ipairs(Q(q, "requiredSourceItems") or {}) do Add(n.itemFor, it, q) end
+            Tick()
+        end
+    end
+    for k, v in pairs(n) do idx[k] = v end
+    idx.ready = true
+    if SB.OnIndexReady then SB.OnIndexReady() end
+end
+
+-- now = build synchronously (tests); otherwise spread over a few seconds after login
+function SB.BuildIndex(now)
+    idx.ready = false
+    if now or not (C_Timer and C_Timer.NewTicker) then Build(false) return end
+    local co = coroutine.create(function() Build(true) end)
+    local ticker
+    ticker = C_Timer.NewTicker(0.02, function()
+        local ok, err = coroutine.resume(co)
+        if not ok then
+            if SB.debug then SB.Print("index: " .. tostring(err)) end
+            ticker:Cancel()
+        elseif coroutine.status(co) == "dead" then
+            ticker:Cancel()
+        end
+    end)
+end
+SB.On("PLAYER_LOGIN", function() SB.After(2, function() SB.BuildIndex() end) end)
 
 ------------------------------------------------------------------------------
 -- NPCs
 ------------------------------------------------------------------------------
 
-local function Ids(s)
-    local out = {}
-    for _, v in ipairs(List(s)) do out[#out + 1] = tonumber(v) end
-    return out
+local npcCache = {}
+
+local function Zones(id, c)
+    local zones = {}
+    local spawns = N(id, "spawns")
+    if type(spawns) == "table" then
+        for area, pts in pairs(spawns) do
+            local list = {}
+            for _, p in ipairs(pts) do if type(p) == "table" and p[1] and p[1] >= 0 then list[#list + 1] = p end end
+            local z = { area = area, count = #list }
+            if #list > 0 then
+                local cx, cy = 0, 0
+                for _, p in ipairs(list) do cx, cy = cx + p[1], cy + p[2] end
+                cx, cy = cx / #list, cy / #list
+                local best, bd
+                for _, p in ipairs(list) do
+                    local d = (p[1] - cx) ^ 2 + (p[2] - cy) ^ 2
+                    if not bd or d < bd then best, bd = p, d end
+                end
+                z.x, z.y = best[1], best[2]
+            end
+            zones[#zones + 1] = z
+        end
+        table.sort(zones, function(a, b) if a.count ~= b.count then return a.count > b.count end return a.area < b.area end)
+    end
+    if #zones == 0 then
+        local z = N(id, "zoneID")
+        local area = (z and z ~= 0 and z) or (c and c.map > 0 and InstanceAreaTable()[c.map])
+        if area then zones[1] = { area = area, count = 0 } end
+    end
+    return zones
 end
 
--- Returns a table describing the NPC, or nil if it isn't in the database.
+local function Flags()
+    SB.QDB()
+    local f = LQ and LQ.Enum and LQ.Enum.npcFlags
+    return f or { VENDOR = 4, FLIGHT_MASTER = 8, TRAINER = 16, REPAIR = 16384 }
+end
+
+local function HasFlag(flags, bitValue)
+    if not bitValue or bitValue == 0 or not flags then return false end
+    return math.floor(flags / bitValue) % 2 == 1
+end
+
+-- A table describing the NPC (nil if nothing at all is known about it).
 function SB.GetNpc(id)
     id = tonumber(id)
     if not id then return nil end
-    local c = npcCache[id]
-    if c ~= nil then return c or nil end
-    local raw = D.npc and D.npc[id]
-    if not raw then npcCache[id] = false return nil end
-    local f = Fields(raw)
+    local cached = npcCache[id]
+    if cached ~= nil then return cached or nil end
+    local c = Classic(id)
+    local name = N(id, "name")
+    local seen = SB.db and SB.db.mobs[id]
+    if not name and not c and not seen then npcCache[id] = false return nil end
     local n = {
-        id = id, name = f[N_NAME], sub = f[N_SUB] ~= "" and f[N_SUB] or nil,
-        minLevel = tonumber(f[N_MINL]) or 0, maxLevel = tonumber(f[N_MAXL]) or 0,
-        rank = tonumber(f[N_RANK]) or 0, type = tonumber(f[N_TYPE]) or 0, family = tonumber(f[N_FAMILY]) or 0,
-        hpMin = tonumber(f[N_HPMIN]) or 0, hpMax = tonumber(f[N_HPMAX]) or 0, mana = tonumber(f[N_MANA]) or 0,
-        goldMin = tonumber(f[N_GOLDMIN]) or 0, goldMax = tonumber(f[N_GOLDMAX]) or 0,
-        friendly = f[N_FRIENDLY] ~= "" and f[N_FRIENDLY] or nil,
-        starts = Ids(f[N_STARTS]), ends = Ids(f[N_ENDS]), killFor = Ids(f[N_KILLFOR]),
-        worldDrops = tonumber(f[N_WORLD]) or 0, classic = f[N_CLASSIC] == "1", display = tonumber(f[N_DISPLAY]),
-        zones = {}, dropFor = {},
+        id = id, name = name or (seen and seen.name) or ("NPC #" .. id), sub = N(id, "subName"),
+        minLevel = N(id, "minLevel") or 0, maxLevel = N(id, "maxLevel") or 0,
+        rank = N(id, "rank") or (c and c.rank) or 0,
+        type = c and c.type or 0, family = c and c.family or 0,
+        hpMin = c and c.hpMin or 0, hpMax = c and c.hpMax or 0, mana = c and c.mana or 0,
+        goldMin = c and c.goldMin or 0, goldMax = c and c.goldMax or 0,
+        friendly = N(id, "friendlyToFaction"), starts = N(id, "questStarts") or {}, ends = N(id, "questEnds") or {},
+        worldDrops = c and c.worldDrops or 0, display = c and c.display or 0,
+        live = name ~= nil, classic = c ~= nil,
     }
-    local flags = f[N_FLAGS] or ""
-    n.boss = flags:find("B") ~= nil
+    if n.sub == "" then n.sub = nil end
+    if n.friendly == "" then n.friendly = nil end
+    if n.maxLevel == 0 and seen and seen.lv then n.minLevel, n.maxLevel = seen.lv, seen.lv end
+    local flags = c and c.flags or ""
+    n.boss = flags:find("B") ~= nil or n.rank == 3
     n.skinnable = flags:find("S") ~= nil
     n.pickpocket = flags:find("P") ~= nil
-    n.vendor = flags:find("V") ~= nil
-    n.trainer = flags:find("T") ~= nil
-    n.flightMaster = flags:find("F") ~= nil
-    n.repair = flags:find("R") ~= nil
-    for _, z in ipairs(List(f[N_ZONES])) do
-        local area, x, y, count = strsplit(":", z)
-        n.zones[#n.zones + 1] = { area = tonumber(area), x = tonumber(x), y = tonumber(y), count = tonumber(count) or 0 }
-    end
-    for _, d in ipairs(List(f[N_DROPFOR])) do
-        local q, item = strsplit("/", d)
-        n.dropFor[#n.dropFor + 1] = { quest = tonumber(q), item = tonumber(item) }
-    end
+    local npcFlags, F = N(id, "npcFlags") or 0, Flags()
+    n.vendor = HasFlag(npcFlags, F.VENDOR)
+    n.trainer = HasFlag(npcFlags, F.TRAINER)
+    n.flightMaster = HasFlag(npcFlags, F.FLIGHT_MASTER)
+    n.repair = HasFlag(npcFlags, F.REPAIR)
+    n.zones = Zones(id, c)
     npcCache[id] = n
     return n
 end
+
+-- Forget what's cached about an NPC (after seeing its name in the game).
+function SB.ForgetNpc(id) npcCache[id] = nil end
 
 function SB.NpcName(id)
     local n = SB.GetNpc(id)
     return n and n.name or ("NPC #" .. tostring(id))
 end
 
--- "Elite Boss", "Rare", ... (nil for plain normal mobs)
 function SB.Classification(n)
-    if n.boss then return n.rank == 0 and "Boss" or (n.rank == 3 and "Boss" or SB.RANKS[n.rank] .. " Boss") end
+    if n.boss then return (n.rank == 1 or n.rank == 2) and (SB.RANKS[n.rank] .. " Boss") or "Boss" end
     if n.rank and n.rank > 0 then return SB.RANKS[n.rank] end
 end
 
 function SB.LevelText(n)
     if not n then return "?" end
-    if n.rank == 3 or n.maxLevel >= 63 and n.boss then return "??" end
+    if n.maxLevel == 0 then return "?" end
+    if n.boss and n.rank == 3 and n.maxLevel >= 63 then return "??" end
     if n.minLevel == n.maxLevel then return tostring(n.minLevel) end
     return n.minLevel .. "-" .. n.maxLevel
+end
+
+-- Quests that need this NPC killed (from the index; empty until it's built).
+function SB.KillFor(id) return idx.killFor and idx.killFor[id] or {} end
+
+-- Quests that need an item this NPC drops: { {quest=, item=} }
+function SB.DropFor(id)
+    local out, seen = {}, {}
+    for _, d in ipairs(SB.GetLoot(id)) do
+        for _, q in ipairs(idx.itemFor and idx.itemFor[d.item] or {}) do
+            local it = SB.GetItem(d.item)
+            -- quest items, or items few mobs drop; Linen Cloth turn-ins aren't a reason to flag every humanoid
+            local few = SB.DropperCount(d.item) <= 20
+            if (d.quest or it.class == 12 or few) and not seen[q .. ":" .. d.item] then
+                seen[q .. ":" .. d.item] = true
+                out[#out + 1] = { quest = q, item = d.item }
+            end
+        end
+    end
+    return out
 end
 
 ------------------------------------------------------------------------------
 -- Loot
 ------------------------------------------------------------------------------
 
-local function ParseLoot(s)
-    local out = {}
-    for _, e in ipairs(List(s)) do
-        local item, chance, q = strsplit(":", e)
-        out[#out + 1] = { item = tonumber(item), chance = tonumber(chance), quest = q == "q" }
-    end
-    return out
-end
+local lootCache = {}
 
--- { {item=, chance=(percent or nil), quest=bool}, ... } highest chance first
+-- { {item=, chance=(percent or nil), quest=bool, src="classic"|"wowhead"|nil}, ... } best first.
+-- Forever (QuestieDB) decides which items drop; the chance is Wowhead's for quest items,
+-- otherwise the Classic number when there is one.
 function SB.GetLoot(id)
     local c = lootCache[id]
-    if c then return c end
+    if c and (c.ready or not idx.ready) then return c end
     c = ParseLoot(D.loot and D.loot[id])
+    local have = {}
+    for _, d in ipairs(c) do have[d.item] = d end
+    local rates = WowheadRates()
+    for _, item in ipairs(idx.foreverItems and idx.foreverItems[id] or {}) do
+        if not have[item] then
+            local d = { item = item, quest = false }
+            c[#c + 1] = d
+            have[item] = d
+        end
+    end
+    if rates then
+        for item, d in pairs(have) do
+            local r = rates[item] and rates[item][id]
+            if r then d.chance, d.src = r, "wowhead" end
+        end
+    end
+    table.sort(c, function(a, b)
+        if (a.chance or -1) ~= (b.chance or -1) then return (a.chance or -1) > (b.chance or -1) end
+        return a.item < b.item
+    end)
+    c.ready = idx.ready
     lootCache[id] = c
     return c
 end
@@ -124,19 +469,77 @@ function SB.GetExtraLoot(id)
     return out
 end
 
+local function Ids(s)
+    local out = {}
+    for _, v in ipairs(List(s)) do out[#out + 1] = tonumber(v) end
+    return out
+end
+
 function SB.GetSpells(id)
     return Ids(D.spells and D.spells[id])
 end
 
+-- The chance for one NPC/item pair: Wowhead's rate for quest items, else the Classic number.
+local function ChanceFor(npc, item)
+    local rates = WowheadRates()
+    local r = rates and rates[item] and rates[item][npc]
+    if r then return r, "wowhead" end
+    local c = idx.classicChance and idx.classicChance[item] and idx.classicChance[item][npc]
+    if c then return c, "classic" end
+    if not idx.ready then
+        for _, d in ipairs(ParseLoot(D.loot and D.loot[npc])) do if d.item == item then return d.chance, "classic" end end
+    end
+end
+
+-- How many NPCs drop the item (cheap; no chances looked up).
+function SB.DropperCount(item)
+    local seen, n = {}, 0
+    for _, npc in ipairs(I(item, "npcDrops") or {}) do if not seen[npc] then seen[npc] = true; n = n + 1 end end
+    for npc in pairs(idx.classicChance and idx.classicChance[item] or {}) do if not seen[npc] then seen[npc] = true; n = n + 1 end end
+    return n
+end
+
+-- Every NPC that drops the item: { {npc=, chance=, src=} } best first. Live list from QuestieDB,
+-- plus Classic sources it doesn't list.
+function SB.Droppers(item)
+    local out, seen = {}, {}
+    for _, npc in ipairs(I(item, "npcDrops") or {}) do
+        if not seen[npc] then
+            seen[npc] = true
+            local chance, src = ChanceFor(npc, item)
+            out[#out + 1] = { npc = npc, chance = chance, src = src }
+        end
+    end
+    for _, d in ipairs(idx.classicDroppers and idx.classicDroppers[item] or {}) do
+        if not seen[d.npc] then
+            seen[d.npc] = true
+            local chance, src = ChanceFor(d.npc, item)
+            out[#out + 1] = { npc = d.npc, chance = chance or d.chance, src = src or "classic" }
+        end
+    end
+    table.sort(out, function(a, b)
+        if (a.chance or -1) ~= (b.chance or -1) then return (a.chance or -1) > (b.chance or -1) end
+        return a.npc < b.npc
+    end)
+    return out
+end
+
+function SB.GetDroppedBy(item)
+    local list = SB.Droppers(item)
+    return #list, list
+end
+
 ------------------------------------------------------------------------------
--- Items
+-- Items (the client first: it knows every Forever item, hotfixes included)
 ------------------------------------------------------------------------------
+
+local itemCache = {}
 
 local function GameItemInfo(id)
     local getInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
     if not getInfo then return nil end
-    local ok, name, link, quality, ilvl, req, _, _, _, _, icon = pcall(getInfo, id)
-    if ok and name then return name, link, quality, ilvl, req, icon end
+    local ok, name, link, quality, ilvl, req, _, _, _, _, icon, _, class, subClass = pcall(getInfo, id)
+    if ok and name then return name, link, quality, ilvl, req, icon, class, subClass end
 end
 
 function SB.ItemIcon(id)
@@ -148,7 +551,6 @@ function SB.ItemIcon(id)
     return "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
--- Asks the game to load an item it hasn't cached yet; GET_ITEM_INFO_RECEIVED fires when it has.
 function SB.RequestItem(id)
     if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
 end
@@ -158,64 +560,51 @@ function SB.GetItem(id)
     if not id then return nil end
     local it = itemCache[id]
     if not it then
-        it = { id = id }
-        local raw = D.item and D.item[id]
-        if raw then
-            local f = Fields(raw)
-            it.name, it.quality, it.ilvl, it.req = f[1], tonumber(f[2]), tonumber(f[3]), tonumber(f[4])
-            it.class, it.subClass = tonumber(f[5]), tonumber(f[6])
-            if it.quality == -1 then it.quality = nil end
+        it = { id = id, name = I(id, "name"), ilvl = I(id, "itemLevel"), req = I(id, "requiredLevel"),
+               class = I(id, "class"), subClass = I(id, "subClass") }
+        if C_Item and C_Item.GetItemQualityByID then
+            local ok, q = pcall(C_Item.GetItemQualityByID, id)
+            if ok and q then it.quality = q end
         end
         itemCache[id] = it
     end
     if not it.link then
-        local name, link, quality, ilvl, req = GameItemInfo(id)
+        local name, link, quality, ilvl, req, _, class, subClass = GameItemInfo(id)
         if name then
             it.name, it.link, it.quality = name, link, quality or it.quality
             it.ilvl, it.req = ilvl or it.ilvl, req or it.req
+            it.class, it.subClass = class or it.class, subClass or it.subClass
         else
             SB.RequestItem(id)
         end
     end
-    it.name = it.name or ("Item #" .. id)
+    if not it.name then it.name = "Item #" .. id end
     return it
 end
 
-function SB.ItemText(id, noBrackets)
+function SB.ItemText(id, noBrackets, journal)
     local it = SB.GetItem(id)
-    local hex = SB.QUALITY_HEX[it.quality or 1] or "ffffff"
+    local q = it.quality or 1
+    local hex = SB.QUALITY_HEX[q] or "ffffff"
+    if journal and q <= 1 and SB.Skin and SB.Skin.Journal() then hex = SB.Skin.Hex("text") end
     local name = noBrackets and it.name or ("[" .. it.name .. "]")
     return "|cff" .. hex .. name .. "|r"
 end
 
--- total, { {npc=, chance=}, ... } highest chance first (capped list)
-function SB.GetDroppedBy(id)
-    local raw = D.dropby and D.dropby[id]
-    if not raw then return 0, {} end
-    local total, rest = raw:match("^(%d+)|(.*)$")
-    local out = {}
-    for _, e in ipairs(List(rest)) do
-        local npc, chance = strsplit(":", e)
-        out[#out + 1] = { npc = tonumber(npc), chance = tonumber(chance) }
-    end
-    return tonumber(total) or #out, out
-end
-
--- { objectiveOf = {quests}, starts = quest, rewardOf = {quests}, vendors = {npcs}, vendorCount = n, containers = {items}, objects = n }
+-- { objectiveOf = {quests}, starts = quest, rewardOf = {quests}, vendors = {npcs}, vendorCount, containers = {items}, objects }
 function SB.GetItemUses(id)
-    local raw = D.itemq and D.itemq[id]
-    local u = { objectiveOf = {}, rewardOf = {}, vendors = {}, containers = {}, vendorCount = 0, objects = 0 }
-    if not raw then return u end
-    for _, part in ipairs(List(raw, ";")) do
-        local k, v = part:match("^(%a)=(.*)$")
-        if k == "o" then u.objectiveOf = Ids(v)
-        elseif k == "s" then u.starts = tonumber(v)
-        elseif k == "r" then u.rewardOf = Ids(v)
-        elseif k == "v" then
-            local count, list = v:match("^(%d+)|(.*)$")
-            u.vendorCount, u.vendors = tonumber(count) or 0, Ids(list)
-        elseif k == "c" then u.containers = Ids(v)
-        elseif k == "g" then u.objects = tonumber(v) or 0
+    local u = { objectiveOf = {}, rewardOf = I(id, "questRewards") or {}, vendors = I(id, "vendors") or {},
+                containers = I(id, "itemDrops") or {}, objects = #(I(id, "objectDrops") or {}) }
+    u.vendorCount = #u.vendors
+    local s = I(id, "startQuest")
+    if s and s ~= 0 then u.starts = s end
+    local seen = {}
+    for _, q in ipairs(idx.itemFor and idx.itemFor[id] or {}) do
+        if not seen[q] then seen[q] = true; u.objectiveOf[#u.objectiveOf + 1] = q end
+    end
+    if not idx.ready then
+        for _, q in ipairs(I(id, "relatedQuests") or {}) do
+            if not seen[q] then seen[q] = true; u.objectiveOf[#u.objectiveOf + 1] = q end
         end
     end
     return u
@@ -225,32 +614,52 @@ end
 -- Quests
 ------------------------------------------------------------------------------
 
+local questCache = {}
+
 function SB.GetQuest(id)
     id = tonumber(id)
     if not id then return nil end
     local c = questCache[id]
     if c ~= nil then return c or nil end
-    local raw = D.quest and D.quest[id]
-    if not raw then questCache[id] = false return nil end
-    local f = Fields(raw)
-    c = { id = id, name = f[1], level = tonumber(f[2]) or 0, reqLevel = tonumber(f[3]) or 0,
-          faction = f[4] ~= "" and f[4] or nil, classMask = tonumber(f[5]) or 0, text = f[6],
-          starters = Ids(f[7]), enders = Ids(f[8]), kill = Ids(f[9]), items = Ids(f[10]) }
+    local name = Q(id, "name")
+    if not name then questCache[id] = false return nil end
+    local o = Q(id, "objectives") or {}
+    local kill, items = {}, {}
+    for _, cr in ipairs(o[1] or {}) do if cr[1] then kill[#kill + 1] = cr[1] end end
+    for _, kc in ipairs(o[5] or {}) do
+        for _, cr in ipairs(kc[1] or {}) do kill[#kill + 1] = cr end
+        if kc[2] then kill[#kill + 1] = kc[2] end
+    end
+    for _, it in ipairs(o[3] or {}) do if it[1] then items[#items + 1] = it[1] end end
+    local sb, fb = Q(id, "startedBy") or {}, Q(id, "finishedBy") or {}
+    local text = table.concat(Q(id, "objectivesText") or {}, " ")
+    c = { id = id, name = name, level = Q(id, "questLevel") or 0, reqLevel = Q(id, "requiredLevel") or 0,
+          races = Q(id, "requiredRaces") or 0, classMask = Q(id, "requiredClasses") or 0, text = text,
+          starters = sb[1] or {}, enders = fb[1] or {}, startItems = sb[3] or {}, kill = kill, items = items }
     questCache[id] = c
     return c
 end
 
--- Can this character do the quest at all (faction / class)?
+-- true when masks a and b share a bit (works above 32 bits, unlike bit.band)
+local function Overlap(a, b)
+    while a > 0 and b > 0 do
+        if a % 2 == 1 and b % 2 == 1 then return true end
+        a, b = math.floor(a / 2), math.floor(b / 2)
+    end
+    return false
+end
+
 function SB.QuestForMe(q)
     if not q then return false end
-    if q.faction then
+    if q.races and q.races > 0 then
         local fac = UnitFactionGroup and UnitFactionGroup("player")
-        if fac == "Alliance" and q.faction ~= "A" then return false end
-        if fac == "Horde" and q.faction ~= "H" then return false end
+        local masks = LQ and LQ.Enum and LQ.Enum.factionRaceMasks
+        local mask = masks and masks[fac] or (fac == "Alliance" and (77 + 2 ^ 32) or (178 + 2 ^ 33))
+        if not Overlap(q.races, mask) then return false end
     end
-    if q.classMask and q.classMask > 0 and bit and bit.band then
+    if q.classMask and q.classMask > 0 then
         local classId = select(3, UnitClass("player"))
-        if classId and bit.band(q.classMask, 2 ^ (classId - 1)) == 0 then return false end
+        if classId and not Overlap(q.classMask, 2 ^ (classId - 1)) then return false end
     end
     return true
 end
@@ -264,68 +673,15 @@ function SB.QuestDone(id)
 end
 
 ------------------------------------------------------------------------------
--- Zones
+-- Instances
 ------------------------------------------------------------------------------
 
-function SB.ZoneName(area)
-    area = tonumber(area)
-    if not area then return "Unknown" end
-    area = D.zoneAlias and D.zoneAlias[area] or area
-    if C_Map and C_Map.GetAreaInfo then
-        local ok, name = pcall(C_Map.GetAreaInfo, area)
-        if ok and type(name) == "string" and name ~= "" then return name end
-    end
-    return D.zoneName and D.zoneName[area] or ("Zone #" .. area)
-end
+local instanceCache = {}
 
-function SB.IsInstanceArea(area)
-    area = D.zoneAlias and D.zoneAlias[area] or area
-    if not D.instanceArea then return false end
-    for _, a in pairs(D.instanceArea) do if a == area then return true end end
-    return false
-end
-
--- The areas (database zone IDs) for where the player is now, and a label for them.
-function SB.PlayerAreas()
-    local areas = {}
-    local inInstance = IsInInstance and IsInInstance()
-    if inInstance and GetInstanceInfo then
-        local name, _, _, _, _, _, _, mapId = GetInstanceInfo()
-        local area = D.instanceArea and D.instanceArea[mapId]
-        if area then
-            areas[area] = true
-            for alias, parent in pairs(D.zoneAlias or {}) do if parent == area then areas[alias] = true end end
-            return areas, name or SB.ZoneName(area)
-        end
-    end
-    local uiMap = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
-    if uiMap then
-        for area, m in pairs(D.uiMap or {}) do if m == uiMap then areas[area] = true end end
-        local info = C_Map.GetMapInfo and C_Map.GetMapInfo(uiMap)
-        return areas, info and info.name or GetZoneText()
-    end
-    return areas, GetZoneText and GetZoneText() or "?"
-end
-
-local zoneIndex
--- NPC ids that spawn in any of the given areas, bosses first then by level.
 function SB.NpcsInAreas(areas)
-    if not zoneIndex then
-        zoneIndex = {}
-        for id, raw in pairs(D.npc or {}) do
-            local zones = raw:match("^" .. ("[^^]*%^"):rep(N_ZONES - 1) .. "([^^]*)")
-            if zones then
-                for area in zones:gmatch("(%d+):[^,]*") do
-                    area = tonumber(area)
-                    zoneIndex[area] = zoneIndex[area] or {}
-                    table.insert(zoneIndex[area], id)
-                end
-            end
-        end
-    end
     local seen, out = {}, {}
-    for area in pairs(areas) do
-        for _, id in ipairs(zoneIndex[area] or {}) do
+    for area in pairs(areas or {}) do
+        for _, id in ipairs(idx.npcsInArea and idx.npcsInArea[area] or {}) do
             if not seen[id] then seen[id] = true; out[#out + 1] = id end
         end
     end
@@ -338,24 +694,69 @@ function SB.NpcsInAreas(areas)
     return out
 end
 
+-- { map, area, name, raid, mobs, bosses, minLevel, maxLevel, art = Adventure Guide data }
+function SB.GetInstance(mapID)
+    local cached = instanceCache[mapID]
+    if cached and (cached.ready or not idx.ready) then return cached end
+    local areas, area = SB.InstanceAreas(mapID)
+    if not areas then return nil end
+    local art = SB.Skin and SB.Skin.InstanceArt(mapID)
+    local inst = { map = mapID, area = area, name = (art and art.name) or SB.ZoneName(area), art = art,
+                   raid = art and art.raid or SB.RAID_MAPS[mapID] or false, mobs = SB.NpcsInAreas(areas), bosses = {} }
+    local lo, hi = 999, 0
+    for _, id in ipairs(inst.mobs) do
+        local n = SB.GetNpc(id)
+        if n.boss then inst.bosses[#inst.bosses + 1] = id end
+        if not n.friendly and n.minLevel > 1 and n.rank ~= 3 then
+            lo, hi = math.min(lo, n.minLevel), math.max(hi, n.maxLevel)
+        end
+    end
+    if hi > 0 then inst.minLevel, inst.maxLevel = lo, hi end
+    inst.ready = idx.ready
+    instanceCache[mapID] = inst
+    return inst
+end
+
+function SB.Instances(raid)
+    local out = {}
+    for mapID in pairs(InstanceAreaTable()) do
+        local inst = SB.GetInstance(mapID)
+        if inst and (inst.raid and true or false) == (raid and true or false) and #inst.mobs > 0 then
+            out[#out + 1] = inst
+        end
+    end
+    table.sort(out, function(a, b)
+        if (a.minLevel or 99) ~= (b.minLevel or 99) then return (a.minLevel or 99) < (b.minLevel or 99) end
+        return a.name < b.name
+    end)
+    return out
+end
+
 ------------------------------------------------------------------------------
 -- Search
 ------------------------------------------------------------------------------
 
 local npcNames, itemNames
-local function BuildNames(tbl)
+local function Names(entity, getter)
     local t = {}
-    for id, raw in pairs(tbl or {}) do t[id] = (raw:match("^[^^]*") or ""):lower() end
+    for _, id in ipairs(AllIds(entity)) do
+        local name = getter(id)
+        if type(name) == "string" then t[id] = name:lower() end
+    end
     return t
 end
 
--- Matches by name (or by ID); exact and prefix matches first.
 function SB.Search(text, limit)
     text = (text or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     limit = limit or 150
     if text == "" then return {} end
-    npcNames = npcNames or BuildNames(D.npc)
-    itemNames = itemNames or BuildNames(D.item)
+    SB.QDB()
+    npcNames = npcNames or Names(NpcDB, function(id) return N(id, "name") end)
+    itemNames = itemNames or Names(ItemDB, function(id) return I(id, "name") end)
+    -- mobs you've seen that the database doesn't have
+    for id, m in pairs(SB.db and SB.db.mobs or {}) do
+        if m.name and not npcNames[id] then npcNames[id] = m.name:lower() end
+    end
     local results = {}
     local asId = tonumber(text)
     local function Scan(names, kind)
@@ -370,6 +771,17 @@ function SB.Search(text, limit)
     end
     Scan(npcNames, "npc")
     Scan(itemNames, "item")
+    -- an item ID the database doesn't know, but the client does (new in Forever)
+    if asId and not itemNames[asId] and GameItemInfo(asId) then
+        results[#results + 1] = { kind = "item", id = asId, score = 0, name = GameItemInfo(asId):lower() }
+    end
+    -- items crafted by recipes you've scanned
+    for _, r in pairs(SB.db and SB.db.recipes or {}) do
+        if r.o and not itemNames[r.o] and r.n and r.n:lower():find(text, 1, true) then
+            results[#results + 1] = { kind = "item", id = r.o, score = 3, name = r.n:lower() }
+            itemNames[r.o] = r.n:lower()
+        end
+    end
     table.sort(results, function(a, b)
         if a.score ~= b.score then return a.score < b.score end
         if a.kind ~= b.kind then return a.kind == "npc" end
@@ -403,3 +815,21 @@ function SB.SpellDescription(id)
         if ok and type(d) == "string" and d ~= "" then return d end
     end
 end
+
+function SB.ResetCaches()
+    wipe(npcCache); wipe(lootCache); wipe(itemCache); wipe(questCache); wipe(instanceCache); wipe(cmCache)
+    npcNames, itemNames, uiMapOf = nil, nil, nil
+end
+
+SB.OnIndexReady = function()
+    wipe(lootCache); wipe(instanceCache)
+    if SB.OnDataChanged then SB.OnDataChanged() end
+end
+
+-- Tell the player once when the live database is missing.
+SB.On("PLAYER_LOGIN", function()
+    if SB.QDB() then return end
+    SB.After(6, function()
+        SB.Print("|cffff8800QuestieDB isn't installed or is too old.|r Spawns, quests and \"dropped by\" need it - it comes with Questie. Tooltips still show Classic loot and abilities.")
+    end)
+end)
