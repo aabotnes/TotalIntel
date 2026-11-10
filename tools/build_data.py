@@ -278,6 +278,28 @@ def main():
         if spells:
             spell_out[nid] = ",".join(map(str, spells[:20]))
 
+    # trainers: shared templates plus each trainer's own spells -> "spell:cost:level:skillValue"
+    def trainer_list(rows):
+        rows = sorted(rows, key=lambda r: (num(r["reqlevel"]), num(r["reqskillvalue"]), r["spell"]))
+        return ",".join("%d:%d:%d:%d" % (r["spell"], num(r["spellcost"]), num(r["reqlevel"]), num(r["reqskillvalue"]))
+                        for r in rows)
+    tpl_rows = collections.defaultdict(list)
+    for r in sql_rows(sql, "npc_trainer_template"):
+        tpl_rows[r["entry"]].append(r)
+    own_rows = collections.defaultdict(list)
+    for r in sql_rows(sql, "npc_trainer"):
+        own_rows[r["entry"]].append(r)
+    ttpl_out = {k: trainer_list(v) for k, v in tpl_rows.items()}
+    trainer_out = {}
+    for nid, t in ctpl.items():
+        parts = []
+        if num(t.get("TrainerTemplateId")) in ttpl_out:
+            parts.append("t%d" % num(t["TrainerTemplateId"]))
+        if own_rows.get(nid):
+            parts.append(trainer_list(own_rows[nid]))
+        if parts:
+            trainer_out[nid] = ";".join(parts)
+
     os.makedirs(a.out, exist_ok=True)
     for old in ("Npcs.lua", "Items.lua", "ItemQuests.lua", "Quests.lua", "Zones.lua", "DroppedBy.lua"):
         if os.path.exists(os.path.join(a.out, old)):
@@ -298,6 +320,8 @@ def main():
     write("Loot.lua", "loot", loot_out, "Loot per NPC: item:chance[:q], highest first (q = only drops while on the quest).")
     write("LootExtra.lua", "lootx", extra_out, "Skinning (s=) and pickpocket (p=) loot per NPC.")
     write("Spells.lua", "spells", spell_out, "Spells each NPC casts (spell lists, EventAI and boss scripts).")
+    write("Trainers.lua", "trainer", trainer_out, "What each trainer teaches: tN = template N; spell:cost:level:skill,...")
+    write("TrainerTemplates.lua", "ttpl", ttpl_out, "Shared trainer lists: spell:cost(copper):level:skill,...")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ Total Intel reads everything about WoW: Forever live in the game, from QuestieDB
 | `Loot.lua` | per NPC: item:chance, best first (`:q` = only while on the quest) |
 | `LootExtra.lua` | skinning and pickpocket loot |
 | `Spells.lua` | spells each NPC casts (spell lists, EventAI and boss scripts) |
+| `Trainers.lua`, `TrainerTemplates.lua` | what each trainer teaches: spell, cost, level and skill (the fallback until you visit the trainer in the game) |
 
 They're generated: don't edit them by hand. Change `build_data.py` and run it again.
 

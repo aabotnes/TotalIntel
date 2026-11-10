@@ -14,6 +14,7 @@ Total Intel follows the current version of Forever instead of shipping its own c
 | Which quests a mob is for | also the **game client**: the quest lines on a mob's tooltip carry quest IDs, so every mob you target or mouse over teaches Total Intel its quests, Forever-only ones included |
 | Item names, quality, item levels (Forever-only items included), spells, zone names | the **game client** |
 | Recipes: profession, skill, reagents, how it's learned | the **game client's profession window**: see [Crafting](#crafting) |
+| What vendors sell and trainers teach | the **game client**, read when you open their window (prices, stock, level and skill). Before your first visit: Questie's vendor lists, and the Classic trainer lists (CMaNGOS). |
 | Dungeon and raid artwork and lore | the game's **Adventure Guide** |
 | Drop chances for quest items | Wowhead's rates, shipped by QuestieDB |
 | Other drop chances, mob health, abilities | **Classic reference numbers** (CMaNGOS), bundled because nothing in the game provides them. They're labeled *Classic*. Your own looted rate is shown next to every chance. |
@@ -46,6 +47,8 @@ It's an open book, like the Adventure Guide:
 - **Overview:** type, health, mana, coin, services, where it spawns (click a zone for a map pin), your record, and its best drops.
 - **Loot:** every drop with its chance and where the chance comes from, next to *your* rate on Forever (e.g. *you 3 of 12 (25%)*). It also lists skinning and pickpocket loot, and items you've looted that no database lists.
 - **Abilities:** Adventure Guide-style ability headers. Click one for its description. Spells you see a mob cast are added, with how often.
+- **Sells** (vendors): every item, with price and limited stock once you've opened that vendor. Before that it shows Questie's list.
+- **Teaches** (trainers): every spell or recipe with its level, skill and cost. Click one for details. It's read from the trainer window when you visit; before that it shows the Classic trainer list.
 - **Model:** the mob in 3D. Drag to turn it.
 - **Quests:** on your quests (with progress), needed for, starts, and turn in here.
 - **Notes:** your own notes, saved for all your characters.

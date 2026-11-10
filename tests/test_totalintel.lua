@@ -280,6 +280,52 @@ LibQuestieDB = saved
 SB.ResetSources()
 
 ------------------------------------------------------------------------------
+-- Sells and Teaches
+------------------------------------------------------------------------------
+SB.BuildIndex(true)
+local VENDOR = 90001
+check(SB.Sells(VENDOR)[1] and SB.Sells(VENDOR)[1].item == 17033, "Sells: QuestieDB's vendor list")
+SB.OpenNpc(VENDOR)
+SB.SetTab("sells")
+check(SB.CurrentPage() and select(2, SB.CurrentPage()) == "sells" and Content("Symbol of Divinity"), "Sells tab lists the items")
+-- open the merchant in the game: prices and stock replace the database list
+M.units.npc = { guid = "Creature-0-1-0-1-90001-0000000003", name = "Reagent Vendor 1" }
+GetMerchantNumItems = function() return 2 end
+GetMerchantItemID = function(i) return ({ 17033, 4306 })[i] end
+C_MerchantFrame = { GetItemInfo = function(i) return ({ { price = 2500, stackCount = 1, numAvailable = -1 }, { price = 600, stackCount = 5, numAvailable = 3 } })[i] end }
+M.Fire("MERCHANT_SHOW")
+M.Advance(1)
+local sells, src = SB.Sells(VENDOR)
+check(src == "game" and #sells == 2 and sells[2].limited and sells[2].stack == 5, "Sells: read from the merchant window, with stock")
+SB.SetTab("sells")
+check(Content("2500c") and Content("x5, limited"), "Sells tab shows prices and limited stock")
+
+local TRAINER = 198
+local teach, tsrc = SB.Teaches(TRAINER)
+check(tsrc == "classic" and teach[1] and teach[1].spell == 1472, "Teaches: Classic trainer list as the fallback")
+SB.OpenNpc(TRAINER)
+SB.SetTab("teaches")
+check(Content("Spell1472") and Content("Level 4"), "Teaches tab lists spells with their level")
+M.units.npc = { guid = "Creature-0-1-0-1-198-0000000004", name = "Khelden Bremen" }
+local services = { { "Arcane Intellect", "Rank 1", "available", 10, 1 }, { "Frostbolt", "Rank 2", "unavailable", 100, 8 } }
+GetNumTrainerServices = function() return #services end
+GetTrainerServiceInfo = function(i) return services[i][1], services[i][2], services[i][3] end
+GetTrainerServiceCost = function(i) return services[i][4] end
+GetTrainerServiceLevelReq = function(i) return services[i][5] end
+GetTrainerServiceSkillReq = function() return nil end
+local filters = { available = 1, unavailable = 0, used = 0 }
+GetTrainerServiceTypeFilter = function(f) return filters[f] == 1 end
+local filterChanges = 0
+SetTrainerServiceTypeFilter = function(f, v) filters[f] = v; filterChanges = filterChanges + 1; M.Fire("TRAINER_UPDATE") end
+M.Fire("TRAINER_SHOW")
+M.Advance(1)
+M.Advance(1)
+teach, tsrc = SB.Teaches(TRAINER)
+check(tsrc == "game" and #teach == 2 and teach[2].name == "Frostbolt" and teach[2].level == 8, "Teaches: read from the trainer window")
+check(filters.unavailable == 0 and filters.used == 0 and filterChanges == 4, "trainer filters are restored, without a read loop (" .. filterChanges .. ")")
+M.units.npc = nil
+
+------------------------------------------------------------------------------
 -- Questie's built-in database (Questie releases without the separate QuestieDB addon)
 ------------------------------------------------------------------------------
 saved = LibQuestieDB

@@ -296,6 +296,9 @@ local function NpcOverview(id, n)
         if n.skinnable then services[#services + 1] = "Skinnable" end
         if n.pickpocket then services[#services + 1] = "Can be pickpocketed" end
         if #services > 0 then rows[#rows + 1] = KV("Notes", table.concat(services, ", ")) end
+        local sells, teaches = #SB.Sells(id), #SB.Teaches(id)
+        if sells > 0 then rows[#rows + 1] = KV("Sells", SB.Plural(sells, "item") .. " (Sells tab)") end
+        if teaches > 0 then rows[#rows + 1] = KV("Teaches", SB.Plural(teaches, "skill") .. " (Teaches tab)") end
         if n.friendly then
             rows[#rows + 1] = KV("Friendly to", n.friendly == "AH" and "Alliance and Horde" or (n.friendly == "A" and "Alliance" or "Horde"))
         end
@@ -430,6 +433,53 @@ local function NpcAbilities(id)
     else
         rows[#rows + 1] = Note("Click an ability for its description.")
     end
+    return rows
+end
+
+local function SeenWhen(t) return t and date("%d %b %Y", t) or nil end
+
+local function NpcSells(id)
+    local list, src, t = SB.Sells(id)
+    local rows = { Header("Sells", tostring(#list)) }
+    for _, e in ipairs(list) do
+        local right = {}
+        if e.stack and e.stack > 1 then right[#right + 1] = "x" .. e.stack end
+        if e.limited then right[#right + 1] = "limited" end
+        rows[#rows + 1] = ItemRow(e.item, e.price and e.price > 0 and SB.Money(e.price) or nil,
+            #right > 0 and table.concat(right, ", ") or nil)
+    end
+    rows[#rows + 1] = Note(src == "game" and ("As you saw it on " .. SeenWhen(t) .. ". Visiting again refreshes it.")
+        or "From Questie's database. Open this vendor in the game to see prices and stock.")
+    return rows
+end
+
+local function NpcTeaches(id)
+    local list, src, t = SB.Teaches(id)
+    local rows = { Header("Teaches", tostring(#list)) }
+    for _, e in ipairs(list) do
+        local name, icon = e.name, e.icon
+        if e.spell then
+            local n2, i2 = SB.SpellInfo(e.spell)
+            name, icon = name or n2, icon or i2
+        end
+        name = (name or ("Spell " .. tostring(e.spell))) .. (e.rank and (" (" .. e.rank .. ")") or "")
+        local key = "t" .. id .. ":" .. (e.spell or name)
+        local needs = {}
+        if e.level and e.level > 1 then needs[#needs + 1] = "Level " .. e.level end
+        if e.skill and e.skill > 0 then needs[#needs + 1] = (e.skillName or "Skill") .. " " .. e.skill end
+        rows[#rows + 1] = { kind = "spell", id = e.spell, icon = icon, text = name, expanded = state.expanded[key],
+                            right = needs[1] and table.concat(needs, ", ") or nil,
+                            onClick = function() state.expanded[key] = not state.expanded[key]; SB.Redraw(true) end }
+        if state.expanded[key] then
+            if e.cost and e.cost > 0 then rows[#rows + 1] = KV("Cost", SB.Money(e.cost)) end
+            if #needs > 0 then rows[#rows + 1] = KV("Requires", table.concat(needs, ", ")) end
+            local desc = e.spell and SB.SpellDescription(e.spell)
+            if desc then rows[#rows + 1] = { kind = "text", text = desc, indent = 34 } end
+            if e.item then rows[#rows + 1] = ItemRow(e.item) end
+        end
+    end
+    rows[#rows + 1] = Note(src == "game" and ("As you saw it on " .. SeenWhen(t) .. ". Visiting again refreshes it.")
+        or "Classic trainer list. Open this trainer in the game to see exactly what it teaches on Forever.")
     return rows
 end
 
@@ -654,15 +704,18 @@ end
 -- Tabs
 ------------------------------------------------------------------------------
 
+local NPC_TABS = {
+    { key = "overview", tip = "Overview", off = "TabBossOff", on = "TabBossOn" },
+    { key = "loot", tip = "Loot", off = "TabLootOff", on = "TabLootOn" },
+    { key = "abilities", tip = "Abilities", off = "TabAbilitiesOff", on = "TabAbilitiesOn" },
+    { key = "sells", tip = "Sells", icon = "Interface\\Icons\\INV_Misc_Bag_10", when = function(id) return #SB.Sells(id) > 0 end },
+    { key = "teaches", tip = "Teaches", icon = "Interface\\Icons\\INV_Misc_Book_11", when = function(id) return #SB.Teaches(id) > 0 end },
+    { key = "model", tip = "Model", off = "TabModelOff", on = "TabModelOn" },
+    { key = "quests", tip = "Quests", icon = "Interface\\Icons\\INV_Misc_Book_08" },
+    { key = "notes", tip = "Your notes", icon = "Interface\\Icons\\INV_Misc_Note_01" },
+}
+
 local TABS = {
-    npc = {
-        { key = "overview", tip = "Overview", off = "TabBossOff", on = "TabBossOn" },
-        { key = "loot", tip = "Loot", off = "TabLootOff", on = "TabLootOn" },
-        { key = "abilities", tip = "Abilities", off = "TabAbilitiesOff", on = "TabAbilitiesOn" },
-        { key = "model", tip = "Model", off = "TabModelOff", on = "TabModelOn" },
-        { key = "quests", tip = "Quests", icon = "Interface\\Icons\\INV_Misc_Book_08" },
-        { key = "notes", tip = "Your notes", icon = "Interface\\Icons\\INV_Misc_Note_01" },
-    },
     item = {
         { key = "overview", tip = "Overview", off = "TabLootOff", on = "TabLootOn" },
         { key = "droppedby", tip = "Dropped by", off = "TabBossOff", on = "TabBossOn" },
@@ -676,8 +729,18 @@ local TABS = {
     },
 }
 
+local function TabsFor(page)
+    if not page then return {} end
+    if page.kind ~= "npc" then return TABS[page.kind] or {} end
+    local out = {}
+    for _, t in ipairs(NPC_TABS) do
+        if not t.when or t.when(page.id) then out[#out + 1] = t end
+    end
+    return out
+end
+
 local function DrawTabs()
-    local tabs = state.page and TABS[state.page.kind] or {}
+    local tabs = TabsFor(state.page)
     local valid = false
     for _, t in ipairs(tabs) do if t.key == state.tab then valid = true end end
     if not valid then state.tab = "overview" end
@@ -897,6 +960,8 @@ local function DrawPage(keep)
             return
         end
         if state.tab == "loot" then rows = NpcLoot(p.id, n)
+        elseif state.tab == "sells" then rows = NpcSells(p.id)
+        elseif state.tab == "teaches" then rows = NpcTeaches(p.id)
         elseif state.tab == "abilities" then rows = NpcAbilities(p.id)
         elseif state.tab == "quests" then rows = NpcQuests(p.id, n)
         else rows = NpcOverview(p.id, n) end
@@ -1152,7 +1217,7 @@ local function CreateUI()
 
     -- side tabs, hanging off the right edge like the journal's
     ui.sideTabs = {}
-    for i = 1, 6 do
+    for i = 1, 8 do
         local b = TabButton(ui, i)
         if i == 1 then b:SetPoint("TOPLEFT", ui, "TOPRIGHT", -8, -104)
         else b:SetPoint("TOP", ui.sideTabs[i - 1], "BOTTOM", 0, 2) end

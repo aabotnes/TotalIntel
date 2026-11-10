@@ -13,9 +13,12 @@ Data\Classic.lua
 Data\Loot.lua
 Data\LootExtra.lua
 Data\Spells.lua
+Data\Trainers.lua
+Data\TrainerTemplates.lua
 Skin.lua
 Database.lua
 Professions.lua
+Merchants.lua
 Quests.lua
 Tracker.lua
 Tooltip.lua

@@ -49,6 +49,9 @@ function SB.AddNpcLines(tt, id, unit)
             local _, class = UnitClass("player")
             if class == "ROGUE" then parts[#parts + 1] = "|cffd8b080Pickpocket|r" end
         end
+        local sells, teaches = #SB.Sells(id), #SB.Teaches(id)
+        if sells > 0 then parts[#parts + 1] = "Sells " .. sells end
+        if teaches > 0 then parts[#parts + 1] = "Teaches " .. teaches end
         if #parts > 0 then Add(tt, table.concat(parts, " · "), GREY) Header() end
     end
     if n and o.health and n.hpMax > 0 then

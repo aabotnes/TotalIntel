@@ -265,6 +265,7 @@ local function Build(yield)
     local n = {
         classicDroppers = {}, -- item -> { {npc, chance, quest} } from the Classic loot tables
         foreverItems = {},     -- npc  -> { item, ... } from QuestieDB's npcDrops
+        sells = {},            -- npc  -> { item, ... } from QuestieDB's vendors
         npcsInArea = {},       -- area -> { npc, ... }
         killFor = {},          -- npc  -> { quest, ... }
         itemFor = {},          -- item -> { quest, ... } (quest objectives and required items)
@@ -285,6 +286,7 @@ local function Build(yield)
     if SB.QDB() then
         for _, item in ipairs(AllIds(ItemDB)) do
             for _, npc in ipairs(I(item, "npcDrops") or {}) do Add(n.foreverItems, npc, item) end
+            for _, npc in ipairs(I(item, "vendors") or {}) do Add(n.sells, npc, item) end
             Tick()
         end
         for _, npc in ipairs(AllIds(NpcDB)) do
@@ -544,6 +546,36 @@ local function Ids(s)
     local out = {}
     for _, v in ipairs(List(s)) do out[#out + 1] = tonumber(v) end
     return out
+end
+
+-- What a vendor sells: the list you saw in the game (with prices) when you've visited it,
+-- otherwise QuestieDB's. { {item=, price=, stack=, limited=}, ... }, src = "game"|"questie"
+function SB.Sells(id)
+    local seen = SB.db and SB.db.vendors and SB.db.vendors[id]
+    if seen and seen.items then return seen.items, "game", seen.t end
+    local out = {}
+    for _, item in ipairs(idx.sells and idx.sells[id] or {}) do out[#out + 1] = { item = item } end
+    table.sort(out, function(a, b) return a.item < b.item end)
+    return out, "questie"
+end
+
+local function ParseTrainer(s, out)
+    for spell, cost, level, skill in (s or ""):gmatch("(%d+):(%d+):(%d+):(%d+)") do
+        out[#out + 1] = { spell = tonumber(spell), cost = tonumber(cost), level = tonumber(level), skill = tonumber(skill) }
+    end
+end
+
+-- What a trainer teaches: the list you saw in the game when you've visited it, otherwise the
+-- Classic reference list. { {spell=, name=, rank=, cost=, level=, skill=, skillName=, icon=}, ... }, src
+function SB.Teaches(id)
+    local seen = SB.db and SB.db.trainers and SB.db.trainers[id]
+    if seen and seen.list and #seen.list > 0 then return seen.list, "game", seen.t end
+    local out = {}
+    for _, part in ipairs(List(D.trainer and D.trainer[id], ";")) do
+        local tpl = part:match("^t(%d+)$")
+        if tpl then ParseTrainer(D.ttpl and D.ttpl[tonumber(tpl)], out) else ParseTrainer(part, out) end
+    end
+    return out, "classic"
 end
 
 function SB.GetSpells(id)
