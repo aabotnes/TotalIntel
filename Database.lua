@@ -560,8 +560,9 @@ function SB.Sells(id)
 end
 
 local function ParseTrainer(s, out)
-    for spell, cost, level, skill in (s or ""):gmatch("(%d+):(%d+):(%d+):(%d+)") do
-        out[#out + 1] = { spell = tonumber(spell), cost = tonumber(cost), level = tonumber(level), skill = tonumber(skill) }
+    for spell, cost, level, line, skill in (s or ""):gmatch("(%d+):(%d+):(%d+):(%d+):(%d+)") do
+        out[#out + 1] = { spell = tonumber(spell), cost = tonumber(cost), level = tonumber(level),
+                          skillLine = tonumber(line), skill = tonumber(skill) }
     end
 end
 

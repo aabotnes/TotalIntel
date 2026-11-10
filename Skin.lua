@@ -58,6 +58,48 @@ local DARK = {
     ModelPaperFrame = { 0, 0, 0, 0 }, HeaderOverview = { 0.25, 0.17, 0.08, 0.9 },
 }
 
+-- Rows, headers and bars are drawn, not cut from the journal art: stretched art slices smear
+-- (the boss button's dark end, the loot frame's fade, seams in the paper headers).
+-- name = { r, g, b, a, to = { r, g, b, a } }   (to = the color at the top, for a soft gradient)
+local FLAT = {
+    journal = {
+        RowBg = { 0.10, 0.06, 0.02, 0.84, to = { 0.19, 0.12, 0.05, 0.84 } },
+        RowBgSel = { 0.34, 0.20, 0.04, 0.95, to = { 0.52, 0.33, 0.08, 0.95 } },
+        RowEdgeTop = { 1, 0.86, 0.6, 0.14 },
+        RowEdgeBottom = { 0, 0, 0, 0.6 },
+        RowHL = { 1, 0.85, 0.5, 0.12 },
+        Accent = { 1, 0.78, 0.2, 1 },
+        HeaderBg = { 0.16, 0.08, 0.02, 0.94, to = { 0.27, 0.15, 0.04, 0.94 } },
+        HeaderLine = { 1, 0.78, 0.25, 0.6 },
+        BarBg = { 0, 0, 0, 0.55 },
+        IconEdge = { 0, 0, 0, 0.9 },
+    },
+    dark = {
+        RowBg = { 0.09, 0.09, 0.11, 0.92, to = { 0.15, 0.15, 0.18, 0.92 } },
+        RowBgSel = { 0.26, 0.19, 0.06, 0.96, to = { 0.38, 0.28, 0.08, 0.96 } },
+        RowEdgeTop = { 1, 1, 1, 0.07 },
+        RowEdgeBottom = { 0, 0, 0, 0.6 },
+        RowHL = { 1, 1, 1, 0.08 },
+        Accent = { 1, 0.78, 0.2, 1 },
+        HeaderBg = { 0.16, 0.12, 0.05, 0.96, to = { 0.24, 0.18, 0.07, 0.96 } },
+        HeaderLine = { 1, 0.78, 0.25, 0.6 },
+        BarBg = { 0, 0, 0, 0.55 },
+        IconEdge = { 0, 0, 0, 0.9 },
+    },
+}
+
+local function Paint(tex, c)
+    tex:SetTexCoord(0, 1, 0, 1)
+    tex:SetVertexColor(1, 1, 1, 1)
+    if c.to and CreateColor and tex.SetGradient then
+        tex:SetColorTexture(1, 1, 1, 1)
+        local ok = pcall(tex.SetGradient, tex, "VERTICAL",
+            CreateColor(c[1], c[2], c[3], c[4]), CreateColor(c.to[1], c.to[2], c.to[3], c.to[4]))
+        if ok then return end
+    end
+    tex:SetColorTexture(c[1], c[2], c[3], c[4])
+end
+
 -- colors per style
 local PALETTE = {
     journal = {
@@ -74,12 +116,13 @@ local PALETTE = {
         lootSub = { 0.88, 0.8, 0.66 },
         lootMid = { 1, 0.92, 0.7 },
         you = { 0.55, 0.85, 1 },
+        light = { 1, 0.96, 0.88 },
     },
     dark = {
         text = { 0.9, 0.9, 0.9 }, dim = { 0.65, 0.65, 0.65 }, key = { 1, 0.82, 0 },
         title = { 1, 0.82, 0 }, boss = { 1, 0.86, 0.6 }, bossSub = { 0.75, 0.75, 0.75 }, header = { 1, 0.82, 0 },
         good = { 0.4, 1, 0.4 }, warn = { 1, 0.82, 0 }, off = { 0.55, 0.55, 0.55 }, you = { 0.55, 0.85, 1 },
-        lootSub = { 0.75, 0.75, 0.75 }, lootMid = { 1, 0.92, 0.7 },
+        lootSub = { 0.75, 0.75, 0.75 }, lootMid = { 1, 0.92, 0.7 }, light = { 1, 1, 1 },
     },
 }
 
@@ -110,6 +153,8 @@ end
 
 -- Paints a texture with a journal piece (or its dark-style color). sized = also set its size.
 function Skin.Apply(tex, name, sized)
+    local flat = FLAT[Skin.Journal() and "journal" or "dark"][name]
+    if flat then Paint(tex, flat) return tex end
     local t = Skin.TEX[name]
     if Skin.Journal() and t then
         tex:SetTexture(t[1], t.tile and "REPEAT" or nil)
@@ -141,14 +186,29 @@ function Skin.Refresh(frame)
     for _, c in ipairs({ frame:GetChildren() }) do Skin.Refresh(c) end
 end
 
--- A paper header bar (left cap, tiled middle, right cap) like the journal's ability headers.
+-- A row background: a dark bar with a light top edge and a dark bottom edge.
+function Skin.Bar(frame, name)
+    local bg = Skin.New(frame, name or "RowBg", "BACKGROUND")
+    bg:SetAllPoints()
+    local top = Skin.New(frame, "RowEdgeTop", "BORDER")
+    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(1)
+    local bottom = Skin.New(frame, "RowEdgeBottom", "BORDER")
+    bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT"); bottom:SetHeight(1)
+    return bg
+end
+
+-- A section header: a dark band with a gold line under it. (highlight = just the hover glow)
 function Skin.PaperHeader(frame, highlight)
-    local l = Skin.New(frame, highlight and "PaperHLLeft" or "PaperLeft", highlight and "HIGHLIGHT" or "BACKGROUND")
-    l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMLEFT"); l:SetWidth(64)
-    local r = Skin.New(frame, highlight and "PaperHLRight" or "PaperRight", highlight and "HIGHLIGHT" or "BACKGROUND")
-    r:SetPoint("TOPRIGHT"); r:SetPoint("BOTTOMRIGHT"); r:SetWidth(64)
-    local m = Skin.New(frame, highlight and "PaperHLMid" or "PaperMid", highlight and "HIGHLIGHT" or "BACKGROUND")
-    m:SetPoint("TOPLEFT", l, "TOPRIGHT"); m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+    if highlight then
+        local hl = Skin.New(frame, "RowHL", "HIGHLIGHT")
+        hl:SetAllPoints()
+        return hl
+    end
+    local bg = Skin.New(frame, "HeaderBg", "BACKGROUND")
+    bg:SetAllPoints()
+    local line = Skin.New(frame, "HeaderLine", "BORDER")
+    line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
+    return bg
 end
 
 -- A round portrait of a creature (from its display ID), or a round icon.

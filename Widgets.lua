@@ -76,7 +76,7 @@ function W.Check(parent, label, tooltip, get, set)
         c:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
     end
     if c.Text then c.Text:SetText("") end
-    c.label = W.Text(c, "GameFontHighlight")
+    c.label = W.Text(c, W.Font("GameFontBlackMedium", "GameFontHighlight"))
     c.label:SetPoint("LEFT", c, "RIGHT", 2, 1)
     c.label:SetText(label)
     c:SetHitRectInsets(0, -(c.label:GetStringWidth() or 100) - 4, 0, 0)
@@ -94,7 +94,7 @@ end
 function W.Cycle(parent, label, tooltip, choices, get, set, width)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize((width or 150) + 130, 24)
-    f.label = W.Text(f, "GameFontHighlight")
+    f.label = W.Text(f, W.Font("GameFontBlackMedium", "GameFontHighlight"))
     f.label:SetPoint("LEFT", 4, 0)
     f.label:SetText(label)
     f.button = W.Button(f, "", width or 150, 22, function()
@@ -120,12 +120,12 @@ end
 function W.Stepper(parent, label, min, max, get, set)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(200, 24)
-    f.label = W.Text(f, "GameFontHighlight")
+    f.label = W.Text(f, W.Font("GameFontBlackMedium", "GameFontHighlight"))
     f.label:SetPoint("LEFT", 4, 0)
     f.label:SetText(label)
     f.minus = W.Button(f, "-", 24, 22, function() set(math.max(min, get() - 1)); f:Refresh() end)
     f.minus:SetPoint("LEFT", f.label, "RIGHT", 8, 0)
-    f.value = W.Text(f, "GameFontNormal")
+    f.value = W.Text(f, W.Font("GameFontBlackMedium", "GameFontNormal"))
     f.value:SetPoint("LEFT", f.minus, "RIGHT", 4, 0)
     f.value:SetWidth(24)
     f.plus = W.Button(f, "+", 24, 22, function() set(math.min(max, get() + 1)); f:Refresh() end)
@@ -133,7 +133,7 @@ function W.Stepper(parent, label, min, max, get, set)
     f.Refresh = function(self)
         self.value:SetText(tostring(get()))
         Skin.Color(self.label, "text")
-        Skin.Color(self.value, "key")
+        Skin.Color(self.value, "text")
     end
     return f
 end
@@ -246,11 +246,12 @@ local function RowTooltip(btn)
         if not ok then GameTooltip:AddLine(SB.ItemText(r.id)) end
         GameTooltip:AddLine("|cff888888Click: open its page · Shift-click: link in chat|r")
         GameTooltip:Show()
-    elseif (r.kind == "spell") and r.id then
+    elseif (r.kind == "spell" or r.kind == "teach") and r.id then
         GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
         local ok = pcall(GameTooltip.SetSpellByID, GameTooltip, r.id)
         if not ok then GameTooltip:AddLine(SB.SpellInfo(r.id) or ("Spell " .. r.id), 1, 1, 1) end
-        GameTooltip:AddLine("|cff888888Spell " .. r.id .. " · Click: show or hide details · Shift-click: link in chat|r")
+        GameTooltip:AddLine("|cff888888Spell " .. r.id .. (r.kind == "spell" and " · Click: show or hide details" or " · Click: Wowhead link")
+            .. " · Shift-click: link in chat|r")
         GameTooltip:Show()
     elseif r.tooltip then
         GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
@@ -272,7 +273,7 @@ local function RowClick(btn, mouse)
         if link and ChatEdit_InsertLink then ChatEdit_InsertLink(link) end
         return
     end
-    if IsShiftKeyDown() and r.kind == "spell" and r.id then
+    if IsShiftKeyDown() and (r.kind == "spell" or r.kind == "teach") and r.id then
         local f = (C_Spell and C_Spell.GetSpellLink) or GetSpellLink
         local link = f and f(r.id)
         if link and ChatEdit_InsertLink then ChatEdit_InsertLink(link) end
@@ -290,37 +291,49 @@ end
 
 local B = {}
 
--- Boss buttons, as in the journal's encounter list.
+local BODY = W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight"))
+local BODY_SMALL = W.Font("GameFontBlack", "GameFontHighlightSmall")
+
+-- A clickable row on a dark bar that fills its whole width.
+local function BarRow(parent, height)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetHeight(height)
+    b.bg = Skin.Bar(b, "RowBg")
+    b.sel = Skin.New(b, "RowBgSel", "BACKGROUND", 1)
+    b.sel:SetAllPoints()
+    b.sel:Hide()
+    b.accent = Skin.New(b, "Accent", "BORDER", 1)
+    b.accent:SetPoint("TOPLEFT"); b.accent:SetPoint("BOTTOMLEFT"); b.accent:SetWidth(3)
+    b.accent:Hide()
+    local hl = Skin.New(b, "RowHL", "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetBlendMode("ADD")
+    Interactive(b)
+    return b
+end
+
+-- Mobs in the left page's list: portrait, name, a line of details.
 B.boss = {
     new = function(parent)
-        local b = CreateFrame("Button", nil, parent)
-        b:SetSize(325, 55)
-        b.bg = Skin.New(b, "BossButtonUp", "BACKGROUND")
-        b.bg:SetAllPoints()
-        b.sel = Skin.New(b, "BossButtonDown", "BACKGROUND", 1)
-        b.sel:SetAllPoints()
-        b.hl = Skin.New(b, "BossButtonHighlight", "HIGHLIGHT")
-        b.hl:SetAllPoints()
-        b.portrait = Skin.Portrait(b, 38)
-        b.portrait:SetPoint("LEFT", 16, 0)
+        local b = BarRow(parent, 44)
+        b.portrait = Skin.Portrait(b, 32)
+        b.portrait:SetPoint("LEFT", 10, 0)
         b.name = W.Text(b, W.Font("GameFontNormalMed3", "GameFontNormal"))
-        b.name:SetPoint("TOPLEFT", 66, -12)
-        b.name:SetPoint("RIGHT", -50, 0)
+        b.name:SetPoint("TOPLEFT", 54, -7)
+        b.name:SetPoint("RIGHT", -56, 0)
         b.name:SetJustifyH("LEFT")
         b.name:SetWordWrap(false)
         b.sub = W.Text(b, "GameFontHighlightSmall")
-        b.sub:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -4)
+        b.sub:SetPoint("BOTTOMLEFT", 54, 8)
         b.sub:SetPoint("RIGHT", -12, 0)
         b.sub:SetJustifyH("LEFT")
         b.sub:SetWordWrap(false)
-        b.right = W.Text(b, "GameFontNormalSmall")
-        b.right:SetPoint("TOPRIGHT", -14, -12)
-        Interactive(b)
+        b.right = W.Text(b, "GameFontNormal")
+        b.right:SetPoint("RIGHT", -12, 0)
         return b
     end,
     set = function(b, r, width)
-        local w = math.max(260, width - 8)
-        b:SetWidth(w)
+        b:SetWidth(width)
         b.name:SetText(r.text or "")
         TextColor(b.name, r.color, "boss")
         b.sub:SetText(r.sub or "")
@@ -328,103 +341,102 @@ B.boss = {
         b.right:SetText(r.right or "")
         Skin.Color(b.right, "boss")
         b.sel:SetShown(r.selected and true or false)
+        b.accent:SetShown(r.selected and true or false)
         Skin.SetPortrait(b.portrait, r.portrait, r.icon)
-        return 55, math.floor((width - w) / 2)
+        return 44, 0
     end,
-    gap = 2,
+    gap = 3,
 }
 
--- Loot rows, as in the journal's loot tab. Also used for mobs (with a portrait).
-local function LootRow(parent, round)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(321, 45)
-    b.bg = Skin.New(b, "LootFrame", "BORDER")
-    b.bg:SetPoint("LEFT")
-    b.bg:SetSize(321, 45)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetPoint("TOPLEFT", 1, -1)
-    hl:SetPoint("BOTTOMRIGHT", -1, 1)
-    hl:SetColorTexture(1, 0.85, 0.5, 0.1)
-    hl:SetBlendMode("ADD")
+-- Items, mobs on the right page, and things a trainer teaches: icon, name and a line of details
+-- on the left, two values on the right.
+local function IconRow(parent, round)
+    local b = BarRow(parent, 40)
     if round then
-        b.icon = Skin.Portrait(b, 34)
-        b.icon:SetPoint("LEFT", 6, 0)
+        b.icon = Skin.Portrait(b, 30)
+        b.icon:SetPoint("LEFT", 8, 0)
     else
-        b.icon = b:CreateTexture(nil, "BACKGROUND")
-        b.icon:SetSize(42, 42)
-        b.icon:SetPoint("TOPLEFT", 2, -2)
+        b.edge = Skin.New(b, "IconEdge", "ARTWORK")
+        b.edge:SetSize(34, 34)
+        b.edge:SetPoint("LEFT", 3, 0)
+        b.icon = b:CreateTexture(nil, "OVERLAY")
+        b.icon:SetSize(30, 30)
+        b.icon:SetPoint("CENTER", b.edge)
     end
     b.name = W.Text(b, W.Font("GameFontNormalMed3", "GameFontNormal"))
-    b.name:SetPoint("TOPLEFT", 51, -7)
-    b.name:SetPoint("RIGHT", -110, 0)
+    b.name:SetPoint("TOPLEFT", 46, -6)
     b.name:SetJustifyH("LEFT")
     b.name:SetWordWrap(false)
     b.sub = W.Text(b, "GameFontHighlightSmall")
-    b.sub:SetPoint("BOTTOMLEFT", 51, 7)
-    b.sub:SetPoint("RIGHT", -130, 0)
+    b.sub:SetPoint("BOTTOMLEFT", 46, 7)
     b.sub:SetJustifyH("LEFT")
     b.sub:SetWordWrap(false)
     b.mid = W.Text(b, W.Font("GameFontNormalMed3", "GameFontNormal"))
-    b.mid:SetPoint("TOPRIGHT", -10, -7)
+    b.mid:SetPoint("TOPRIGHT", -10, -6)
     b.mid:SetJustifyH("RIGHT")
     b.right = W.Text(b, "GameFontHighlightSmall")
     b.right:SetPoint("BOTTOMRIGHT", -10, 7)
     b.right:SetJustifyH("RIGHT")
-    Interactive(b)
+    b.name:SetPoint("RIGHT", b.mid, "LEFT", -8, 0)
+    b.sub:SetPoint("RIGHT", b.right, "LEFT", -8, 0)
     return b
 end
 
-local function SetLootRow(b, r, width, round)
-    local w = math.max(260, width - 4)
-    b:SetWidth(w)
-    b.bg:SetWidth(w)
-    if round then Skin.SetPortrait(b.icon, r.portrait, r.icon)
-    else W.SetIcon(b.icon, r.icon) end
+local function SetIconRow(b, r, width, round)
+    b:SetWidth(width)
+    if round then
+        Skin.SetPortrait(b.icon, r.portrait, r.icon)
+    else
+        W.SetIcon(b.icon, r.icon)
+        local hex = r.quality and r.quality >= 2 and SB.QUALITY_HEX[r.quality]
+        if hex then
+            b.edge:SetColorTexture(tonumber(hex:sub(1, 2), 16) / 255, tonumber(hex:sub(3, 4), 16) / 255, tonumber(hex:sub(5, 6), 16) / 255, 1)
+        else
+            Skin.Apply(b.edge, "IconEdge")
+        end
+    end
     b.name:SetText(r.text or "")
-    TextColor(b.name, r.color, "boss")
+    TextColor(b.name, r.color, "light")
     b.sub:SetText(r.sub or "")
     Skin.Color(b.sub, "lootSub")
     b.mid:SetText(r.mid or "")
     Skin.Color(b.mid, "lootMid")
     b.right:SetText(r.right or "")
-    Skin.Color(b.right, "you")
-    return 45, math.floor((width - w) / 2)
+    TextColor(b.right, r.rightColor, "you")
+    b:SetAlpha(r.faded and 0.6 or 1)
+    return 40, 0
 end
 
-B.item = { new = function(p) return LootRow(p, false) end, set = function(b, r, w) return SetLootRow(b, r, w, false) end, gap = 3 }
-B.npc = { new = function(p) return LootRow(p, true) end, set = function(b, r, w) return SetLootRow(b, r, w, true) end, gap = 3 }
+B.item = { new = function(p) return IconRow(p, false) end, set = function(b, r, w) return SetIconRow(b, r, w, false) end, gap = 3 }
+B.teach = B.item
+B.npc = { new = function(p) return IconRow(p, true) end, set = function(b, r, w) return SetIconRow(b, r, w, true) end, gap = 3 }
 
--- Paper headers: section titles, and abilities that open to show their description.
+-- Section headers, and abilities that open to show their description.
 B.header = {
     new = function(parent)
         local b = CreateFrame("Button", nil, parent)
-        b:SetHeight(29)
+        b:SetHeight(26)
         Skin.PaperHeader(b, false)
-        b.hlFrame = CreateFrame("Frame", nil, b)
-        b.hlFrame:SetAllPoints()
         Skin.PaperHeader(b, true)
         b.expand = W.Text(b, "GameFontNormalLarge")
         b.expand:SetPoint("LEFT", 8, 0)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetSize(18, 18)
-        b.border = Skin.New(b, "AbilityIconBorder", "OVERLAY")
-        b.border:SetPoint("CENTER", b.icon)
-        b.border:SetSize(22, 22)
         b.title = W.Text(b, "GameFontNormal")
         b.title:SetJustifyH("LEFT")
         b.title:SetWordWrap(false)
-        b.right = W.Text(b, "GameFontNormalSmall")
-        b.right:SetPoint("RIGHT", -12, 0)
+        b.right = W.Text(b, "GameFontHighlightSmall")
+        b.right:SetPoint("RIGHT", -10, 0)
         Interactive(b)
         return b
     end,
     set = function(b, r, width)
         b:SetWidth(width)
-        local x = 12
+        local x = 10
         if r.kind == "spell" then
-            b.expand:SetText(r.expanded and "–" or "+")
+            b.expand:SetText(r.expanded and "-" or "+")
             b.expand:Show()
-            x = 24
+            x = 26
         else
             b.expand:Hide()
         end
@@ -432,28 +444,30 @@ B.header = {
             b.icon:SetTexture(r.icon)
             b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
             b.icon:SetPoint("LEFT", x, 0)
-            b.icon:Show(); b.border:Show()
+            b.icon:Show()
             x = x + 24
         else
-            b.icon:Hide(); b.border:Hide()
+            b.icon:Hide()
         end
+        b.title:ClearAllPoints()
         b.title:SetPoint("LEFT", x, 0)
-        b.title:SetPoint("RIGHT", -60, 0)
+        b.title:SetPoint("RIGHT", b.right, "LEFT", -8, 0)
         b.title:SetText(r.text or "")
-        TextColor(b.title, r.color, "header")
+        TextColor(b.title, r.color, r.kind == "spell" and "light" or "header")
         b.right:SetText(r.right or "")
-        Skin.Color(b.right, "title")
+        Skin.Color(b.right, "lootSub")
         b:EnableMouse((r.onClick or r.tooltip or r.kind == "spell") and true or false)
-        return 29, 0
+        return 26, 0
     end,
-    gap = 4, before = 8,
+    gap = 3, before = 8,
 }
-B.spell = B.header
+B.spell = { new = B.header.new, set = B.header.set, gap = 3 }
 
+-- Plain text on the parchment.
 B.text = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
-        f.text = W.Text(f, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
+        f.text = W.Text(f, BODY)
         f.text:SetPoint("TOPLEFT")
         f.text:SetJustifyH("LEFT")
         f.text:SetJustifyV("TOP")
@@ -461,12 +475,12 @@ B.text = {
         return f
     end,
     set = function(f, r, width)
-        local indent = r.indent or 8
+        local indent = r.indent or 6
         f:SetWidth(width - indent)
-        f.text:SetWidth(width - indent - 8)
+        f.text:SetWidth(width - indent - 6)
         f.text:SetText(r.text or "")
         TextColor(f.text, r.color, "text")
-        local h = (f.text:GetStringHeight() or 14) + 4
+        local h = (f.text:GetStringHeight() or 14) + 6
         f:SetHeight(h)
         return h, indent
     end,
@@ -477,50 +491,50 @@ B.columns = B.text
 B.kv = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
-        f.key = W.Text(f, W.Font("GameFontNormal", "GameFontHighlight"))
+        f.key = W.Text(f, BODY)
         f.key:SetPoint("TOPLEFT")
         f.key:SetWidth(130)
         f.key:SetJustifyH("LEFT")
         f.key:SetWordWrap(false)
-        f.value = W.Text(f, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
+        f.value = W.Text(f, BODY)
         f.value:SetPoint("TOPLEFT", 136, 0)
         f.value:SetJustifyH("LEFT")
         f.value:SetJustifyV("TOP")
         return f
     end,
     set = function(f, r, width)
-        f:SetWidth(width - 12)
+        f:SetWidth(width - 10)
         f.key:SetText(r.key or "")
-        Skin.Color(f.key, "key")
-        f.value:SetWidth(width - 12 - 144)
+        Skin.Color(f.key, "dim")
+        f.value:SetWidth(width - 10 - 142)
         f.value:SetText(r.text or "")
         TextColor(f.value, r.color, "text")
         local h = math.max(f.key:GetStringHeight() or 14, f.value:GetStringHeight() or 14) + 6
         f:SetHeight(h)
-        return h, 12
+        return h, 10
     end,
     gap = 1,
 }
 
--- One-line rows with a small icon: quests, zones.
+-- One-line rows with a small icon: quests, zones, links.
 B.line = {
     new = function(parent)
         local b = CreateFrame("Button", nil, parent)
         b:SetHeight(26)
         local hl = b:CreateTexture(nil, "HIGHLIGHT")
         hl:SetAllPoints()
-        hl:SetColorTexture(0.55, 0.35, 0.1, 0.18)
+        hl:SetColorTexture(0.45, 0.28, 0.08, 0.2)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetSize(16, 16)
-        b.icon:SetPoint("LEFT", 8, 0)
-        b.text = W.Text(b, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
+        b.icon:SetPoint("LEFT", 6, 0)
+        b.text = W.Text(b, BODY)
         b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
         b.text:SetJustifyH("LEFT")
         b.text:SetWordWrap(false)
-        b.mid = W.Text(b, W.Font("GameFontBlack", "GameFontHighlightSmall"))
+        b.mid = W.Text(b, BODY_SMALL)
         b.mid:SetJustifyH("RIGHT")
-        b.right = W.Text(b, W.Font("GameFontBlack", "GameFontHighlightSmall"))
-        b.right:SetPoint("RIGHT", -8, 0)
+        b.right = W.Text(b, BODY_SMALL)
+        b.right:SetPoint("RIGHT", -6, 0)
         b.right:SetJustifyH("RIGHT")
         b.mid:SetPoint("RIGHT", b.right, "LEFT", -10, 0)
         b.text:SetPoint("RIGHT", b.mid, "LEFT", -8, 0)
@@ -537,73 +551,171 @@ B.line = {
         b.right:SetText(r.right or "")
         TextColor(b.right, r.rightColor, "key")
         b:EnableMouse((r.onClick or r.tooltip) and true or false)
-        return 26, 4
+        return 26, 0
     end,
     gap = 0,
 }
 B.quest = B.line
 B.zone = B.line
 
--- Instance tiles, as in the journal's dungeon and raid grid (up to 4 per row).
+-- A skill bar like the ones in the game's skill window: "Fishing  [#####   37 / 75]".
+B.bar = {
+    new = function(parent)
+        local f = CreateFrame("Frame", nil, parent)
+        f:SetHeight(28)
+        Skin.Bar(f, "RowBg")
+        f.label = W.Text(f, "GameFontNormal")
+        f.label:SetPoint("LEFT", 10, 0)
+        f.label:SetWidth(150)
+        f.label:SetJustifyH("LEFT")
+        f.label:SetWordWrap(false)
+        local bar = CreateFrame("StatusBar", nil, f)
+        bar:SetPoint("LEFT", 166, 0)
+        bar:SetPoint("RIGHT", -10, 0)
+        bar:SetHeight(16)
+        bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+        local bg = Skin.New(bar, "BarBg", "BACKGROUND")
+        bg:SetAllPoints()
+        f.bar = bar
+        f.value = W.Text(bar, "GameFontHighlightSmall")
+        f.value:SetPoint("CENTER", 0, 1)
+        return f
+    end,
+    set = function(f, r, width)
+        f:SetWidth(width)
+        f.label:SetText(r.text or "")
+        Skin.Color(f.label, "header")
+        local max = math.max(1, r.max or 1)
+        f.bar:SetMinMaxValues(0, max)
+        f.bar:SetValue(math.min(r.value or 0, max))
+        if r.value then
+            f.bar:SetStatusBarColor(0.1, 0.42, 0.95, 1)
+            f.value:SetText(("%d / %d"):format(r.value, r.max or r.value))
+            f.value:SetTextColor(1, 1, 1)
+        else
+            f.bar:SetStatusBarColor(0.4, 0.1, 0.1, 1)
+            f.value:SetText(r.missing or "Not learned")
+            f.value:SetTextColor(1, 0.35, 0.35)
+        end
+        return 28, 0
+    end,
+    gap = 3,
+}
+
+-- Filter chips: toggles on one or more lines, with an optional Reset at the end.
+-- row.chips = { { text, color = {r,g,b}, on = bool, onClick = fn, tip = "..." }, ... }
+B.filters = {
+    new = function(parent)
+        local f = CreateFrame("Frame", nil, parent)
+        f.chips = {}
+        return f
+    end,
+    set = function(f, r, width)
+        f:SetWidth(width)
+        local x, y, lineH = 0, 0, 24
+        for i, c in ipairs(r.chips or {}) do
+            local chip = f.chips[i]
+            if not chip then
+                chip = CreateFrame("Button", nil, f)
+                chip:SetHeight(22)
+                Skin.Bar(chip, "RowBg")
+                chip.mark = chip:CreateTexture(nil, "ARTWORK")
+                chip.mark:SetPoint("BOTTOMLEFT", 1, 1)
+                chip.mark:SetPoint("BOTTOMRIGHT", -1, 1)
+                chip.mark:SetHeight(2)
+                local hl = Skin.New(chip, "RowHL", "HIGHLIGHT")
+                hl:SetAllPoints()
+                chip.text = W.Text(chip, "GameFontHighlightSmall")
+                chip.text:SetPoint("CENTER", 0, 1)
+                chip:SetScript("OnClick", function(self) if self.def and self.def.onClick then self.def.onClick() end end)
+                chip:SetScript("OnEnter", function(self)
+                    if self.def and self.def.tip then W.Tooltip(self, self.def.text, self.def.tip) end
+                end)
+                chip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                f.chips[i] = chip
+            end
+            chip.def = c
+            chip.text:SetText(c.text or "")
+            local col = c.color or { 1, 0.82, 0 }
+            if c.on then
+                chip.text:SetTextColor(col[1], col[2], col[3])
+                chip.mark:SetColorTexture(col[1], col[2], col[3], 1)
+                chip:SetAlpha(1)
+            else
+                chip.text:SetTextColor(0.6, 0.6, 0.6)
+                chip.mark:SetColorTexture(0, 0, 0, 0)
+                chip:SetAlpha(0.55)
+            end
+            local w = math.floor((chip.text:GetStringWidth() or 50) + 18)
+            if x > 0 and x + w > width then x, y = 0, y + lineH end
+            chip:SetWidth(w)
+            chip:ClearAllPoints()
+            chip:SetPoint("TOPLEFT", x, -y)
+            chip:Show()
+            x = x + w + 4
+        end
+        for i = #(r.chips or {}) + 1, #f.chips do f.chips[i]:Hide() end
+        f:SetHeight(y + lineH)
+        return y + lineH, 0
+    end,
+    gap = 4,
+}
+
+-- Instance tiles, as in the journal's dungeon and raid grid.
 local TILE_W, TILE_H = 174, 96
+local function Tile(f)
+    local t = CreateFrame("Button", nil, f)
+    t:SetSize(TILE_W, TILE_H)
+    t.art = t:CreateTexture(nil, "BACKGROUND")
+    t.art:SetAllPoints()
+    t.portrait = Skin.Portrait(t, 40)
+    t.portrait:SetPoint("BOTTOMRIGHT", -14, 12)
+    t.frame = Skin.New(t, "DungeonButtonUp", "BORDER")
+    t.frame:SetAllPoints()
+    t.hl = Skin.New(t, "DungeonButtonHL", "HIGHLIGHT")
+    t.hl:SetAllPoints()
+    t.name = W.Text(t, W.Font("QuestTitleFontBlackShadow", "GameFontNormalLarge"))
+    t.name:SetPoint("TOP", 0, -15)
+    t.name:SetWidth(150)
+    t.name:SetTextColor(1, 0.92, 0.75)
+    t.sub = W.Text(t, "GameFontNormal")
+    t.sub:SetPoint("BOTTOMLEFT", 9, 9)
+    t:SetScript("OnEnter", RowTooltip)
+    t:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    t:SetScript("OnClick", RowClick)
+    return t
+end
+
 B.tiles = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
         f.tiles = {}
-        for i = 1, 4 do
-            local t = CreateFrame("Button", nil, f)
-            t:SetSize(TILE_W, TILE_H)
-            t.art = t:CreateTexture(nil, "BACKGROUND")
-            t.art:SetAllPoints()
-            t.portrait = Skin.Portrait(t, 44)
-            t.portrait:SetPoint("TOPLEFT", 14, -12)
-            t.frame = Skin.New(t, "DungeonButtonUp", "BORDER")
-            t.frame:SetAllPoints()
-            t.hl = Skin.New(t, "DungeonButtonHL", "HIGHLIGHT")
-            t.hl:SetAllPoints()
-            t.name = W.Text(t, W.Font("QuestFont_Large", "GameFontNormalLarge"))
-            t.name:SetPoint("BOTTOMLEFT", 12, 26)
-            t.name:SetPoint("RIGHT", -10, 0)
-            t.name:SetJustifyH("LEFT")
-            t.name:SetTextColor(1, 0.92, 0.75)
-            t.name:SetShadowOffset(1, -1)
-            t.sub = W.Text(t, "GameFontHighlightSmall")
-            t.sub:SetPoint("BOTTOMLEFT", 12, 10)
-            t.sub:SetTextColor(0.85, 0.8, 0.7)
-            t.sub:SetShadowOffset(1, -1)
-            t:SetScript("OnEnter", RowTooltip)
-            t:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            t:SetScript("OnClick", RowClick)
-            f.tiles[i] = t
-        end
         return f
     end,
     set = function(f, r, width)
-        local gap = math.max(6, math.floor((width - 4 * TILE_W) / 5))
+        local per = r.perRow or #r.tiles
+        local gap = math.max(6, math.floor((width - per * TILE_W) / (per + 1)))
         f:SetSize(width, TILE_H)
-        for i, t in ipairs(f.tiles) do
-            local d = r.tiles[i]
+        for i, d in ipairs(r.tiles) do
+            local t = f.tiles[i]
+            if not t then t = Tile(f); f.tiles[i] = t end
             t.row = d
-            if d then
-                t:Show()
-                t:ClearAllPoints()
-                t:SetPoint("TOPLEFT", gap + (i - 1) * (TILE_W + gap), 0)
-                if d.art then
-                    t.art:SetTexture(d.art)
-                    t.art:SetTexCoord(0, 1, 0, 1)
-                    t.portrait:Hide(); t.portrait.ring:Hide()
-                else
-                    Skin.Apply(t.art, "DungeonBG")
-                    t.art:SetTexCoord(0.1, 0.6, 0.1, 0.4)
-                    t.portrait:Show(); t.portrait.ring:Show()
-                    Skin.SetPortrait(t.portrait, d.portrait, d.icon)
-                end
-                t.name:SetText(d.text or "")
-                t.sub:SetText(d.sub or "")
+            t:Show()
+            t:ClearAllPoints()
+            t:SetPoint("TOPLEFT", gap + (i - 1) * (TILE_W + gap), 0)
+            if d.art then
+                t.art:SetTexture(d.art)
+                t.art:SetTexCoord(0, 0.68359375, 0, 0.7421875)
+                t.portrait:Hide(); t.portrait.ring:Hide()
             else
-                t:Hide()
+                Skin.Apply(t.art, "RowBg")
+                t.portrait:Show(); t.portrait.ring:Show()
+                Skin.SetPortrait(t.portrait, d.portrait, d.icon)
             end
+            t.name:SetText(d.text or "")
+            t.sub:SetText(d.sub or "")
         end
+        for i = #r.tiles + 1, #f.tiles do f.tiles[i]:Hide(); f.tiles[i].row = nil end
         return TILE_H, 0
     end,
     gap = 14,

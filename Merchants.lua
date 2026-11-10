@@ -72,6 +72,7 @@ local function ReadTrainer()
         local name, rank, category = Try(GetTrainerServiceInfo, i)
         if name and category ~= "header" then
             local e = { name = Public(name), rank = Public(rank) ~= "" and Public(rank) or nil }
+            if Public(category) == "used" then e.used = true end
             e.cost = Public(Try(GetTrainerServiceCost, i))
             e.level = Public(Try(GetTrainerServiceLevelReq, i))
             local skillName, skillRank = Try(GetTrainerServiceSkillReq, i)
@@ -113,3 +114,56 @@ SB.AddLoad(function()
 end)
 
 SB.ReadMerchant, SB.ReadTrainer = ReadMerchant, ReadTrainer
+
+------------------------------------------------------------------------------
+-- Your skills (for "Requires Fishing 50": do you have it?)
+------------------------------------------------------------------------------
+
+-- Names for the skill lines trainers ask for, used when the game doesn't name one you lack.
+SB.SKILL_NAMES = { [129] = "First Aid", [164] = "Blacksmithing", [165] = "Leatherworking", [171] = "Alchemy",
+    [182] = "Herbalism", [185] = "Cooking", [186] = "Mining", [197] = "Tailoring", [202] = "Engineering",
+    [333] = "Enchanting", [356] = "Fishing", [393] = "Skinning", [762] = "Riding", [633] = "Lockpicking",
+    [40] = "Poisons", [142] = "Survival" }
+
+local function Lines()
+    local out = {}
+    local count, info
+    if C_SkillInfo and C_SkillInfo.GetNumSkillLines and C_SkillInfo.GetSkillLineInfo then
+        count = Try(C_SkillInfo.GetNumSkillLines) or 0
+        for i = 1, count do
+            info = Try(C_SkillInfo.GetSkillLineInfo, i)
+            if type(info) == "table" and not info.isHeader and info.name then
+                out[#out + 1] = { id = info.skillID, name = info.name, rank = info.rank or 0, max = info.maxRank or 0 }
+            end
+        end
+    elseif GetNumSkillLines and GetSkillLineInfo then
+        for i = 1, Try(GetNumSkillLines) or 0 do
+            local name, header, _, rank, _, _, max = Try(GetSkillLineInfo, i)
+            if name and not header then out[#out + 1] = { name = name, rank = rank or 0, max = max or 0 } end
+        end
+    end
+    return out
+end
+
+-- Your rank in a skill, by skill line ID and/or name: rank, maxRank, name. nil rank = you don't have it.
+function SB.PlayerSkill(id, name)
+    if id and id > 0 and C_SkillInfo and C_SkillInfo.GetSkillLineInfoByID then
+        local info = Try(C_SkillInfo.GetSkillLineInfoByID, id)
+        if type(info) == "table" and info.name then
+            name = name or info.name
+            if (info.maxRank or 0) > 0 then return info.rank or 0, info.maxRank, info.name end
+        end
+    end
+    if id and id > 0 and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
+        local info = Try(C_TradeSkillUI.GetProfessionInfoBySkillLineID, id)
+        if type(info) == "table" and (info.maxSkillLevel or 0) > 0 then
+            return info.skillLevel or 0, info.maxSkillLevel, name or info.professionName
+        end
+        if type(info) == "table" and not name and info.professionName and info.professionName ~= "" then name = info.professionName end
+    end
+    name = name or (id and SB.SKILL_NAMES[id])
+    for _, l in ipairs(Lines()) do
+        if (id and l.id == id) or (name and l.name == name) then return l.rank, l.max, l.name end
+    end
+    return nil, nil, name or (id and ("Skill " .. id)) or "?"
+end

@@ -45,10 +45,10 @@ It's an open book, like the Adventure Guide:
 
 **Mob tabs**
 - **Overview:** type, health, mana, coin, services, where it spawns (click a zone for a map pin), your record, and its best drops.
-- **Loot:** every drop with its chance and where the chance comes from, next to *your* rate on Forever (e.g. *you 3 of 12 (25%)*). It also lists skinning and pickpocket loot, and items you've looted that no database lists.
+- **Loot:** every drop with its chance and where the chance comes from, next to *your* rate on Forever (e.g. *you 3 of 12 (25%)*). It also lists skinning and pickpocket loot, and items you've looted that no database lists. **Filter by rarity** with the chips at the top: click *Poor*, *Common*, *Uncommon*... to hide or show that rarity, and **Reset filter** to show everything again. The filter is remembered.
 - **Abilities:** Adventure Guide-style ability headers. Click one for its description. Spells you see a mob cast are added, with how often.
 - **Sells** (vendors): every item, with price and limited stock once you've opened that vendor. Before that it shows Questie's list.
-- **Teaches** (trainers): every spell or recipe with its level, skill and cost. Click one for details. It's read from the trainer window when you visit; before that it shows the Classic trainer list.
+- **Teaches** (trainers): one row per spell or recipe, with its cost in coins (red if you can't afford it) and what it requires, in green if you meet it and red if you don't. Your own skill is shown as a bar on top, e.g. *Your Fishing 37 / 75*, or *Not learned*. It's read from the trainer window when you visit; before that it shows the Classic trainer list.
 - **Model:** the mob in 3D. Drag to turn it.
 - **Quests:** on your quests (with progress), needed for, starts, and turn in here.
 - **Notes:** your own notes, saved for all your characters.

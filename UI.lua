@@ -82,6 +82,7 @@ local function ItemRow(id, mid, right, sub)
         sub = table.concat(parts, " · ")
     end
     return { kind = "item", id = id, icon = SB.ItemIcon(id), text = SB.ItemText(id, true), mid = mid, right = right,
+             quality = it.quality,
              sub = sub, onClick = function() SB.OpenItem(id) end }
 end
 
@@ -343,15 +344,60 @@ local function NpcOverview(id, n)
     return rows
 end
 
+-- Rarity filter for the Loot tab (saved): SB.db.lootFilter[quality] == false hides that rarity.
+local function RarityShown(item)
+    local q = SB.GetItem(item).quality
+    return q == nil or SB.db.lootFilter[q] ~= false
+end
+
+local function FilterActive()
+    for _, v in pairs(SB.db.lootFilter) do if v == false then return true end end
+    return false
+end
+
+-- The chips row: one toggle per rarity that occurs in `items`, and Reset while a rarity is hidden.
+local function RarityChips(items)
+    local present = {}
+    for _, item in ipairs(items) do
+        local q = SB.GetItem(item).quality
+        if q then present[q] = (present[q] or 0) + 1 end
+    end
+    local chips = {}
+    for q = 0, 7 do
+        if present[q] then
+            local hex = SB.QUALITY_HEX[q] or "ffffff"
+            local on = SB.db.lootFilter[q] ~= false
+            local name = SB.QUALITY_NAMES[q] or ("Quality " .. q)
+            chips[#chips + 1] = {
+                text = name .. " " .. present[q], on = on, quality = q,
+                color = { tonumber(hex:sub(1, 2), 16) / 255, tonumber(hex:sub(3, 4), 16) / 255, tonumber(hex:sub(5, 6), 16) / 255 },
+                tip = on and ("Click to hide " .. name .. " items.") or ("Click to show " .. name .. " items."),
+                onClick = function()
+                    if SB.db.lootFilter[q] == false then SB.db.lootFilter[q] = nil else SB.db.lootFilter[q] = false end
+                    SB.Redraw(true)
+                end,
+            }
+        end
+    end
+    if FilterActive() then
+        chips[#chips + 1] = { text = "Reset filter", on = true, reset = true, color = { 1, 0.82, 0 },
+            tip = "Show every rarity again.",
+            onClick = function() wipe(SB.db.lootFilter); SB.Redraw(true) end }
+    end
+    return { kind = "filters", chips = chips }
+end
+
 local function LootRows(list, yours, corpses)
     local rows = {}
     for _, d in ipairs(list) do
-        local you
-        if corpses and corpses > 0 then
-            local got = yours and yours[d.item] or 0
-            you = ("you %d of %d (%s)"):format(got, corpses, SB.Percent(got / corpses * 100))
+        if RarityShown(d.item) then
+            local you
+            if corpses and corpses > 0 then
+                local got = yours and yours[d.item] or 0
+                you = ("you %d of %d (%s)"):format(got, corpses, SB.Percent(got / corpses * 100))
+            end
+            rows[#rows + 1] = ItemRow(d.item, ChanceText(d), you, d.quest and "Quest drop" or nil)
         end
-        rows[#rows + 1] = ItemRow(d.item, ChanceText(d), you, d.quest and "Quest drop" or nil)
     end
     return rows
 end
@@ -360,37 +406,59 @@ local function NpcLoot(id, n)
     local rows = {}
     local m = SB.db.mobs[id] or {}
     local loot = SB.GetLoot(id)
-    rows[#rows + 1] = Header("Loot", #loot > 0 and tostring(#loot) or nil)
-    local known = {}
+    local ex = SB.GetExtraLoot(id)
+    local known, extra = {}, {}
     for _, d in ipairs(loot) do known[d.item] = true end
-    for _, r in ipairs(LootRows(loot, m.i, m.c)) do rows[#rows + 1] = r end
-    if #loot == 0 then rows[#rows + 1] = Note("No loot known for this mob.") end
+    for item, count in pairs(m.i or {}) do if not known[item] then extra[#extra + 1] = { item = item, count = count } end end
+    table.sort(extra, function(a, b) return a.count > b.count end)
+
+    -- every item on this page, for the filter chips
+    local all = {}
+    for _, d in ipairs(loot) do all[#all + 1] = d.item end
+    for _, e in ipairs(extra) do all[#all + 1] = e.item end
+    for _, d in ipairs(ex.skinning or {}) do all[#all + 1] = d.item end
+    for _, d in ipairs(ex.pickpocket or {}) do all[#all + 1] = d.item end
+    for item in pairs(m.g or {}) do all[#all + 1] = item end
+
+    local lootRows = LootRows(loot, m.i, m.c)
+    local count = #loot > 0 and (#lootRows == #loot and tostring(#loot) or (#lootRows .. " of " .. #loot)) or nil
+    rows[#rows + 1] = Header("Loot", count)
+    if #all > 0 then rows[#rows + 1] = RarityChips(all) end
+    for _, r in ipairs(lootRows) do rows[#rows + 1] = r end
+    if #loot == 0 then
+        rows[#rows + 1] = Note("No loot known for this mob.")
+    elseif #lootRows == 0 then
+        rows[#rows + 1] = Note("Every drop is hidden by the rarity filter. Click a rarity above, or Reset filter.")
+    end
     if n and n.worldDrops > 0 then
         rows[#rows + 1] = Note(("Also rolls on a random world-drop pool (%d possible items)."):format(n.worldDrops))
     end
-    rows[#rows + 1] = Note("Chances: Wowhead for quest items, otherwise Classic numbers. Forever may differ, so your own rate is shown on the right.")
-    local extra = {}
-    for item, count in pairs(m.i or {}) do if not known[item] then extra[#extra + 1] = { item = item, count = count } end end
-    if #extra > 0 then
-        table.sort(extra, function(a, b) return a.count > b.count end)
-        rows[#rows + 1] = Header("Also looted by you")
-        for _, e in ipairs(extra) do
-            rows[#rows + 1] = ItemRow(e.item, nil, ("you %d of %d (%s)"):format(e.count, math.max(1, m.c or 1), SB.Percent(e.count / math.max(1, m.c or 1) * 100)))
+    if #loot > 0 then
+        rows[#rows + 1] = Note("Chances: Wowhead for quest items, otherwise Classic numbers. Forever may differ, so your own rate is shown under each chance.")
+    end
+    local mine = {}
+    for _, e in ipairs(extra) do
+        if RarityShown(e.item) then
+            mine[#mine + 1] = ItemRow(e.item, nil, ("you %d of %d (%s)"):format(e.count, math.max(1, m.c or 1), SB.Percent(e.count / math.max(1, m.c or 1) * 100)))
         end
     end
-    local ex = SB.GetExtraLoot(id)
-    if ex.skinning then
-        rows[#rows + 1] = Header("Skinning")
-        for _, r in ipairs(LootRows(ex.skinning)) do rows[#rows + 1] = r end
+    if #mine > 0 then
+        rows[#rows + 1] = Header("Also looted by you", tostring(#mine))
+        for _, r in ipairs(mine) do rows[#rows + 1] = r end
     end
-    if ex.pickpocket then
-        rows[#rows + 1] = Header("Pickpocket")
-        for _, r in ipairs(LootRows(ex.pickpocket, m.p, m.pc)) do rows[#rows + 1] = r end
+    local function Section(title, list)
+        if #list > 0 then
+            rows[#rows + 1] = Header(title, tostring(#list))
+            for _, r in ipairs(list) do rows[#rows + 1] = r end
+        end
     end
-    if m.g and next(m.g) then
-        rows[#rows + 1] = Header("Gathered from it by you")
-        for item, count in pairs(m.g) do rows[#rows + 1] = ItemRow(item, nil, tostring(count)) end
+    Section("Skinning", LootRows(ex.skinning or {}))
+    Section("Pickpocket", LootRows(ex.pickpocket or {}, m.p, m.pc))
+    local gathered = {}
+    for item, n2 in pairs(m.g or {}) do
+        if RarityShown(item) then gathered[#gathered + 1] = ItemRow(item, tostring(n2)) end
     end
+    Section("Gathered from it by you", gathered)
     return rows
 end
 
@@ -453,9 +521,31 @@ local function NpcSells(id)
     return rows
 end
 
+local GOOD, BAD = "|cff40e040", "|cffff4040"
+
 local function NpcTeaches(id)
     local list, src, t = SB.Teaches(id)
     local rows = { Header("Teaches", tostring(#list)) }
+    local level = UnitLevel("player") or 1
+    local money = GetMoney and GetMoney() or nil
+
+    -- your rank in each skill these need, as bars on top
+    local skills, order = {}, {}
+    for _, e in ipairs(list) do
+        if (e.skill or 0) > 0 or e.skillLine and e.skillLine > 0 then
+            local key = (e.skillLine and e.skillLine > 0 and e.skillLine) or e.skillName
+            if key and not skills[key] then
+                local rank, max, name = SB.PlayerSkill(e.skillLine, e.skillName)
+                skills[key] = { rank = rank, max = max, name = name }
+                order[#order + 1] = key
+            end
+        end
+    end
+    for _, key in ipairs(order) do
+        local sk = skills[key]
+        rows[#rows + 1] = { kind = "bar", text = "Your " .. sk.name, value = sk.rank, max = sk.max, missing = "Not learned" }
+    end
+
     for _, e in ipairs(list) do
         local name, icon = e.name, e.icon
         if e.spell then
@@ -463,20 +553,27 @@ local function NpcTeaches(id)
             name, icon = name or n2, icon or i2
         end
         name = (name or ("Spell " .. tostring(e.spell))) .. (e.rank and (" (" .. e.rank .. ")") or "")
-        local key = "t" .. id .. ":" .. (e.spell or name)
         local needs = {}
-        if e.level and e.level > 1 then needs[#needs + 1] = "Level " .. e.level end
-        if e.skill and e.skill > 0 then needs[#needs + 1] = (e.skillName or "Skill") .. " " .. e.skill end
-        rows[#rows + 1] = { kind = "spell", id = e.spell, icon = icon, text = name, expanded = state.expanded[key],
-                            right = needs[1] and table.concat(needs, ", ") or nil,
-                            onClick = function() state.expanded[key] = not state.expanded[key]; SB.Redraw(true) end }
-        if state.expanded[key] then
-            if e.cost and e.cost > 0 then rows[#rows + 1] = KV("Cost", SB.Money(e.cost)) end
-            if #needs > 0 then rows[#rows + 1] = KV("Requires", table.concat(needs, ", ")) end
-            local desc = e.spell and SB.SpellDescription(e.spell)
-            if desc then rows[#rows + 1] = { kind = "text", text = desc, indent = 34 } end
-            if e.item then rows[#rows + 1] = ItemRow(e.item) end
+        if e.level and e.level > 1 then
+            needs[#needs + 1] = (level >= e.level and GOOD or BAD) .. "level " .. e.level .. "|r"
         end
+        if e.skill and e.skill > 0 then
+            local key = (e.skillLine and e.skillLine > 0 and e.skillLine) or e.skillName
+            local sk = key and skills[key] or { name = e.skillName or "skill" }
+            local ok = sk.rank and sk.rank >= e.skill
+            needs[#needs + 1] = (ok and GOOD or BAD) .. sk.name .. " " .. e.skill .. "|r"
+        end
+        local sub = #needs > 0 and ("Requires " .. table.concat(needs, ", ")) or "No requirements"
+        if e.used then sub = GOOD .. "Already known|r" end
+        local cost
+        if e.cost and e.cost > 0 then
+            cost = SB.Money(e.cost)
+            if money and money < e.cost and not e.used then cost = BAD .. cost .. "|r" end
+        end
+        local spell = e.spell
+        rows[#rows + 1] = { kind = "teach", id = spell, icon = icon or "Interface\\Icons\\INV_Misc_Book_09", text = name,
+                            sub = sub, mid = cost, faded = e.used,
+                            onClick = spell and function() SB.ShowLink("spell", spell, name) end or nil }
     end
     rows[#rows + 1] = Note(src == "game" and ("As you saw it on " .. SeenWhen(t) .. ". Visiting again refreshes it.")
         or "Classic trainer list. Open this trainer in the game to see exactly what it teaches on Forever.")
@@ -888,7 +985,7 @@ local function GridRows(raid)
     local perRow = math.max(2, math.floor(((ui.gridList.width or 775) - 10) / 188))
     for _, inst in ipairs(SB.Instances(raid)) do
         if not row or #row.tiles == perRow then
-            row = { kind = "tiles", tiles = {} }
+            row = { kind = "tiles", tiles = {}, perRow = perRow }
             rows[#rows + 1] = row
         end
         local first = inst.bosses[1] and SB.GetNpc(inst.bosses[1])
@@ -1120,7 +1217,7 @@ local function CreateUI()
     ui.rightTitle:SetPoint("RIGHT", -230, 0)
     ui.rightTitle:SetJustifyH("LEFT")
     ui.rightTitle:SetWordWrap(false)
-    ui.rightSub = Text(right, "GameFontHighlight")
+    ui.rightSub = Text(right, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
     ui.rightSub:SetPoint("TOPLEFT", 34, -60)
     ui.rightSub:SetPoint("RIGHT", -24, 0)
     ui.rightSub:SetJustifyH("LEFT")

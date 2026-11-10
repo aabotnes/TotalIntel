@@ -280,6 +280,27 @@ LibQuestieDB = saved
 SB.ResetSources()
 
 ------------------------------------------------------------------------------
+-- Loot tab: filter by rarity
+------------------------------------------------------------------------------
+SB.BuildIndex(true)
+SB.OpenNpc(HOGGER)
+SB.SetTab("loot")
+local function Chips() for _, r in ipairs(SB.ContentRows()) do if r.kind == "filters" then return r.chips end end end
+local function Chip(pattern) for _, c in ipairs(Chips()) do if c.text:find(pattern) then return c end end end
+local function ItemCount() local n = 0 for _, r in ipairs(SB.ContentRows()) do if r.kind == "item" then n = n + 1 end end return n end
+local allItems = ItemCount()
+check(Chip("Common") and Chip("Uncommon") and not Chip("Reset"), "loot tab has a chip per rarity present, and no Reset while nothing is hidden")
+check(Content("Item #818"), "an uncommon drop is listed")
+Chip("Uncommon").onClick()
+check(not Content("Item #818") and ItemCount() < allItems and Content("Huge Gnoll Claw"), "clicking Uncommon hides the uncommon drops only")
+check(SB.ContentRows()[1].right:find(" of "), "the header shows how many are shown (" .. SB.ContentRows()[1].right .. ")")
+check(not Chip("Uncommon").on and Chip("Reset"), "the chip turns off and Reset appears")
+Chip("Common").onClick()
+check(ItemCount() == 0 and Content("hidden by the rarity filter"), "hiding every rarity explains the empty list")
+Chip("Reset").onClick()
+check(ItemCount() == allItems and not Chip("Reset"), "Reset filter shows everything again")
+
+------------------------------------------------------------------------------
 -- Sells and Teaches
 ------------------------------------------------------------------------------
 SB.BuildIndex(true)
@@ -305,7 +326,32 @@ local teach, tsrc = SB.Teaches(TRAINER)
 check(tsrc == "classic" and teach[1] and teach[1].spell == 1472, "Teaches: Classic trainer list as the fallback")
 SB.OpenNpc(TRAINER)
 SB.SetTab("teaches")
-check(Content("Spell1472") and Content("Level 4"), "Teaches tab lists spells with their level")
+local row = Content("Spell1142")
+check(row and row.kind == "teach" and row.sub:find("level 4") and row.mid == "|cffff4040100c|r",
+    "Teaches: one row per spell with its requirement, and the cost in red when you can't afford it")
+
+-- a fishing trainer: your skill bar on top, requirements green or red against your skill
+local FISHER = 1651
+C_SkillInfo = { GetSkillLineInfoByID = function(sid)
+    if sid == 356 then return { skillID = 356, name = "Fishing", rank = M.fishing or 0, maxRank = M.fishing and 75 or 0 } end
+end }
+M.money = 10000
+SB.OpenNpc(FISHER)
+SB.SetTab("teaches")
+local bar = Content("Your Fishing")
+check(bar and bar.kind == "bar" and bar.value == nil, "Teaches: a skill bar that says when you haven't learned the profession")
+local journeyman = Content("Spell7734")
+check(journeyman.sub:find("|cffff4040Fishing 50", 1, true) and journeyman.mid == "500c", "Journeyman Fishing: requirement in red without the skill, cost in coins")
+M.fishing = 37
+SB.SetTab("teaches")
+bar = Content("Your Fishing")
+check(bar.value == 37 and bar.max == 75, "skill bar shows 37 / 75")
+check(Content("Spell7734").sub:find("|cffff4040Fishing 50", 1, true), "still red at 37 of 50")
+M.fishing = 60
+SB.SetTab("teaches")
+check(Content("Spell7734").sub:find("|cff40e040Fishing 50", 1, true), "green once your skill is high enough")
+local apprentice = Content("Spell7733")
+check(apprentice.sub:find("|cff40e040level 5", 1, true), "level requirements are colored too")
 M.units.npc = { guid = "Creature-0-1-0-1-198-0000000004", name = "Khelden Bremen" }
 local services = { { "Arcane Intellect", "Rank 1", "available", 10, 1 }, { "Frostbolt", "Rank 2", "unavailable", 100, 8 } }
 GetNumTrainerServices = function() return #services end

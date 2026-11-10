@@ -43,6 +43,7 @@ SB.DEFAULTS = {
     itemClick = "ALT",          -- modifier+click on an item or mob opens its page: ALT, CTRL-ALT, SHIFT-ALT, NONE
     learn = true,               -- record kills, loot and spells you see
     minimap = { angle = 215, hide = false },
+    lootFilter = {},            -- [quality] = false hides that rarity on the Loot tab
     mobs = {},
     recent = {},
 }

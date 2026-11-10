@@ -278,11 +278,11 @@ def main():
         if spells:
             spell_out[nid] = ",".join(map(str, spells[:20]))
 
-    # trainers: shared templates plus each trainer's own spells -> "spell:cost:level:skillValue"
+    # trainers: shared templates plus each trainer's own spells -> "spell:cost:level:skillLine:skillValue"
     def trainer_list(rows):
-        rows = sorted(rows, key=lambda r: (num(r["reqlevel"]), num(r["reqskillvalue"]), r["spell"]))
-        return ",".join("%d:%d:%d:%d" % (r["spell"], num(r["spellcost"]), num(r["reqlevel"]), num(r["reqskillvalue"]))
-                        for r in rows)
+        rows = sorted(rows, key=lambda r: (num(r["reqskillvalue"]), num(r["reqlevel"]), r["spell"]))
+        return ",".join("%d:%d:%d:%d:%d" % (r["spell"], num(r["spellcost"]), num(r["reqlevel"]), num(r["reqskill"]),
+                                             num(r["reqskillvalue"])) for r in rows)
     tpl_rows = collections.defaultdict(list)
     for r in sql_rows(sql, "npc_trainer_template"):
         tpl_rows[r["entry"]].append(r)
@@ -320,8 +320,8 @@ def main():
     write("Loot.lua", "loot", loot_out, "Loot per NPC: item:chance[:q], highest first (q = only drops while on the quest).")
     write("LootExtra.lua", "lootx", extra_out, "Skinning (s=) and pickpocket (p=) loot per NPC.")
     write("Spells.lua", "spells", spell_out, "Spells each NPC casts (spell lists, EventAI and boss scripts).")
-    write("Trainers.lua", "trainer", trainer_out, "What each trainer teaches: tN = template N; spell:cost:level:skill,...")
-    write("TrainerTemplates.lua", "ttpl", ttpl_out, "Shared trainer lists: spell:cost(copper):level:skill,...")
+    write("Trainers.lua", "trainer", trainer_out, "What each trainer teaches: tN = template N; spell:cost(copper):level:skillLine:skillValue,...")
+    write("TrainerTemplates.lua", "ttpl", ttpl_out, "Shared trainer lists: spell:cost(copper):level:skillLine:skillValue,...")
 
 
 if __name__ == "__main__":

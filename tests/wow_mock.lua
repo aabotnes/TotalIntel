@@ -171,7 +171,10 @@ function GetLootSlotInfo(i) return nil, "item", M.loot[i].qty or 1 end
 function GetLootSourceInfo(i) return unpack(M.loot[i].sources) end
 
 C_Spell = { GetSpellInfo = function(id) return { name = "Spell" .. id, iconID = 136000 + (id % 100) } end }
-C_Item = { GetItemInfo = function() return nil end, GetItemIconByID = function(id) return 130000 + (id % 1000) end }
+local UNCOMMON = { [818] = true, [1210] = true, [774] = true }
+C_Item = { GetItemInfo = function() return nil end, GetItemIconByID = function(id) return 130000 + (id % 1000) end,
+           GetItemQualityByID = function(id) return UNCOMMON[id] and 2 or 1 end }
+function GetMoney() return M.money or 0 end
 C_Map = { GetBestMapForUnit = function() return 1429 end, GetMapInfo = function() return { name = "Elwynn Forest" } end,
           GetAreaInfo = function(a) return ({ [12] = "Elwynn Forest", [1519] = "Stormwind City" })[a] end }
 
