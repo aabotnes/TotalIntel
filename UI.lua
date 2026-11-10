@@ -270,6 +270,11 @@ end
 -- Right page: NPCs
 ------------------------------------------------------------------------------
 
+local function ChanceText(d)
+    if not d.chance then return "drops" end
+    return SB.Percent(d.chance) .. (d.src == "wowhead" and " (Wowhead)" or "")
+end
+
 local function NpcOverview(id, n)
     local rows = {}
     local m = SB.db.mobs[id] or {}
@@ -330,14 +335,9 @@ local function NpcOverview(id, n)
     end
     if #best > 0 then
         rows[#rows + 1] = Header("Best drops", "all " .. #loot .. " on the Loot tab")
-        for _, d in ipairs(best) do rows[#rows + 1] = ItemRow(d.item, SB.Percent(d.chance), d.quest and "quest" or nil) end
+        for _, d in ipairs(best) do rows[#rows + 1] = ItemRow(d.item, ChanceText(d), nil, d.quest and "Quest drop" or nil) end
     end
     return rows
-end
-
-local function ChanceText(d)
-    if not d.chance then return "drops" end
-    return SB.Percent(d.chance) .. (d.src == "wowhead" and " (Wowhead)" or "")
 end
 
 local function LootRows(list, yours, corpses)
@@ -1028,17 +1028,17 @@ local function CreateUI()
     lh:SetPoint("RIGHT", -6, 0)
     lh:SetHeight(39)
     ui.leftTitle = Text(left, "GameFontNormalLarge")
-    ui.leftTitle:SetPoint("TOPLEFT", 26, -24)
-    ui.leftTitle:SetPoint("RIGHT", -60, 0)
+    ui.leftTitle:SetPoint("TOPLEFT", 32, -24)
+    ui.leftTitle:SetPoint("RIGHT", -70, 0)
     ui.leftTitle:SetJustifyH("LEFT")
     ui.leftTitle:SetWordWrap(false)
     Skin.Color(ui.leftTitle, "title")
     ui.leftCount = Text(left, "GameFontNormal")
-    ui.leftCount:SetPoint("TOPRIGHT", -26, -26)
+    ui.leftCount:SetPoint("TOPRIGHT", -34, -26)
     Skin.Color(ui.leftCount, "title")
     ui.leftList = W.Flow(left)
-    ui.leftList:SetPoint("TOPLEFT", 10, -58)
-    ui.leftList:SetPoint("BOTTOMRIGHT", -6, 8)
+    ui.leftList:SetPoint("TOPLEFT", 16, -60)
+    ui.leftList:SetPoint("BOTTOMRIGHT", -22, 12)
 
 
     local right = CreateFrame("Frame", nil, book)
@@ -1051,27 +1051,28 @@ local function CreateUI()
     rh:SetPoint("LEFT", 6, 0)
     rh:SetHeight(39)
     ui.rightTitle = Text(right, "GameFontNormalLarge")
-    ui.rightTitle:SetPoint("TOPLEFT", 24, -24)
-    ui.rightTitle:SetPoint("RIGHT", -20, 0)
+    ui.rightTitle:SetPoint("TOPLEFT", 34, -24)
+    ui.rightTitle:SetPoint("RIGHT", -230, 0)
     ui.rightTitle:SetJustifyH("LEFT")
     ui.rightTitle:SetWordWrap(false)
     ui.rightSub = Text(right, "GameFontHighlight")
-    ui.rightSub:SetPoint("TOPLEFT", 24, -58)
-    ui.rightSub:SetPoint("RIGHT", -20, 0)
+    ui.rightSub:SetPoint("TOPLEFT", 34, -60)
+    ui.rightSub:SetPoint("RIGHT", -24, 0)
     ui.rightSub:SetJustifyH("LEFT")
     ui.rightSub:SetMaxLines(2)
-    ui.wowhead = Button(right, "Wowhead link", 116, 22, function()
+    ui.wowhead = Button(right, "Wowhead", 92, 22, function()
         local p = state.page
         if p then SB.ShowLink(p.kind, p.id, p.kind == "npc" and SB.NpcName(p.id) or SB.GetItem(p.id).name) end
     end)
-    ui.wowhead:SetPoint("TOPLEFT", 22, -88)
-    ui.pin = Button(right, "Map pin", 90, 22, function()
+    ui.wowhead:SetPoint("TOPRIGHT", -18, -19)
+    ui.pin = Button(right, "Map pin", 84, 22, function()
         if state.page and state.page.kind == "npc" then SB.SetWaypoint(state.page.id) end
     end)
-    ui.pin:SetPoint("LEFT", ui.wowhead, "RIGHT", 6, 0)
+    ui.pin:ClearAllPoints()
+    ui.pin:SetPoint("RIGHT", ui.wowhead, "LEFT", -4, 0)
     ui.content = W.Flow(right)
-    ui.content:SetPoint("TOPLEFT", 12, -118)
-    ui.content:SetPoint("BOTTOMRIGHT", -8, 8)
+    ui.content:SetPoint("TOPLEFT", 28, -84)
+    ui.content:SetPoint("BOTTOMRIGHT", -12, 12)
 
 
     -- model view, like the journal's model tab
@@ -1115,8 +1116,8 @@ local function CreateUI()
 
     -- notes view
     local notes = CreateFrame("Frame", nil, right)
-    notes:SetPoint("TOPLEFT", 12, -118)
-    notes:SetPoint("BOTTOMRIGHT", -8, 8)
+    notes:SetPoint("TOPLEFT", 28, -84)
+    notes:SetPoint("BOTTOMRIGHT", -12, 12)
     local nh = CreateFrame("Frame", nil, notes)
     nh:SetPoint("TOPLEFT"); nh:SetPoint("TOPRIGHT"); nh:SetHeight(26)
     Skin.PaperHeader(nh, false)
@@ -1254,8 +1255,8 @@ function SB.Layout()
     local w = (ui:GetWidth() or WIDTH) - 15
     local half = math.floor(w / 2)
     ui.left:SetWidth(half)
-    ui.leftList.width = half - 16
-    ui.content.width = (w - half) - 20
+    ui.leftList.width = half - 38
+    ui.content.width = (w - half) - 40
     ui.gridList.width = w - 10
     if ui.settingsPage.Layout then ui.settingsPage:Layout(half) end
 end

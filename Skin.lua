@@ -144,9 +144,9 @@ end
 -- A paper header bar (left cap, tiled middle, right cap) like the journal's ability headers.
 function Skin.PaperHeader(frame, highlight)
     local l = Skin.New(frame, highlight and "PaperHLLeft" or "PaperLeft", highlight and "HIGHLIGHT" or "BACKGROUND")
-    l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMLEFT"); l:SetWidth(32)
+    l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMLEFT"); l:SetWidth(64)
     local r = Skin.New(frame, highlight and "PaperHLRight" or "PaperRight", highlight and "HIGHLIGHT" or "BACKGROUND")
-    r:SetPoint("TOPRIGHT"); r:SetPoint("BOTTOMRIGHT"); r:SetWidth(32)
+    r:SetPoint("TOPRIGHT"); r:SetPoint("BOTTOMRIGHT"); r:SetWidth(64)
     local m = Skin.New(frame, highlight and "PaperHLMid" or "PaperMid", highlight and "HIGHLIGHT" or "BACKGROUND")
     m:SetPoint("TOPLEFT", l, "TOPRIGHT"); m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
 end

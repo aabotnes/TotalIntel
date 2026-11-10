@@ -344,7 +344,8 @@ local function LootRow(parent, round)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetPoint("TOPLEFT", 1, -1)
     hl:SetPoint("BOTTOMRIGHT", -1, 1)
-    hl:SetColorTexture(1, 0.9, 0.6, 0.12)
+    hl:SetColorTexture(1, 0.85, 0.5, 0.1)
+    hl:SetBlendMode("ADD")
     if round then
         b.icon = Skin.Portrait(b, 34)
         b.icon:SetPoint("LEFT", 6, 0)
@@ -397,7 +398,7 @@ B.npc = { new = function(p) return LootRow(p, true) end, set = function(b, r, w)
 B.header = {
     new = function(parent)
         local b = CreateFrame("Button", nil, parent)
-        b:SetHeight(26)
+        b:SetHeight(29)
         Skin.PaperHeader(b, false)
         b.hlFrame = CreateFrame("Frame", nil, b)
         b.hlFrame:SetAllPoints()
@@ -443,16 +444,16 @@ B.header = {
         b.right:SetText(r.right or "")
         Skin.Color(b.right, "title")
         b:EnableMouse((r.onClick or r.tooltip or r.kind == "spell") and true or false)
-        return 26, 0
+        return 29, 0
     end,
-    gap = 4, before = 6,
+    gap = 4, before = 8,
 }
 B.spell = B.header
 
 B.text = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
-        f.text = W.Text(f, W.Font("GameFontBlack", "GameFontHighlight"))
+        f.text = W.Text(f, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
         f.text:SetPoint("TOPLEFT")
         f.text:SetJustifyH("LEFT")
         f.text:SetJustifyV("TOP")
@@ -476,12 +477,12 @@ B.columns = B.text
 B.kv = {
     new = function(parent)
         local f = CreateFrame("Frame", nil, parent)
-        f.key = W.Text(f, W.Font("GameFontBlack", "GameFontHighlight"))
+        f.key = W.Text(f, W.Font("GameFontNormal", "GameFontHighlight"))
         f.key:SetPoint("TOPLEFT")
         f.key:SetWidth(130)
         f.key:SetJustifyH("LEFT")
         f.key:SetWordWrap(false)
-        f.value = W.Text(f, W.Font("GameFontBlack", "GameFontHighlight"))
+        f.value = W.Text(f, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
         f.value:SetPoint("TOPLEFT", 136, 0)
         f.value:SetJustifyH("LEFT")
         f.value:SetJustifyV("TOP")
@@ -494,7 +495,7 @@ B.kv = {
         f.value:SetWidth(width - 12 - 144)
         f.value:SetText(r.text or "")
         TextColor(f.value, r.color, "text")
-        local h = math.max(f.key:GetStringHeight() or 14, f.value:GetStringHeight() or 14) + 4
+        local h = math.max(f.key:GetStringHeight() or 14, f.value:GetStringHeight() or 14) + 6
         f:SetHeight(h)
         return h, 12
     end,
@@ -505,14 +506,14 @@ B.kv = {
 B.line = {
     new = function(parent)
         local b = CreateFrame("Button", nil, parent)
-        b:SetHeight(24)
+        b:SetHeight(26)
         local hl = b:CreateTexture(nil, "HIGHLIGHT")
         hl:SetAllPoints()
-        hl:SetColorTexture(1, 0.85, 0.5, 0.15)
+        hl:SetColorTexture(0.55, 0.35, 0.1, 0.18)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetSize(16, 16)
         b.icon:SetPoint("LEFT", 8, 0)
-        b.text = W.Text(b, W.Font("GameFontBlack", "GameFontHighlight"))
+        b.text = W.Text(b, W.Font("GameFontBlackMedium", W.Font("GameFontBlack", "GameFontHighlight")))
         b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
         b.text:SetJustifyH("LEFT")
         b.text:SetWordWrap(false)
@@ -536,7 +537,7 @@ B.line = {
         b.right:SetText(r.right or "")
         TextColor(b.right, r.rightColor, "key")
         b:EnableMouse((r.onClick or r.tooltip) and true or false)
-        return 24, 4
+        return 26, 4
     end,
     gap = 0,
 }

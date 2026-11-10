@@ -44,11 +44,11 @@ function SB.CreateSettingsPage(parent)
         band:SetPoint(i == 1 and "RIGHT" or "LEFT", i == 1 and -6 or 6, 0)
         band:SetHeight(39)
         local title = W.Text(half, "GameFontNormalLarge")
-        title:SetPoint("TOPLEFT", 26, -24)
+        title:SetPoint("TOPLEFT", 32, -24)
         title:SetText(i == 1 and "Mob tooltips" or "Item tooltips")
         half.title = title
         local col = CreateFrame("Frame", nil, half)
-        col:SetPoint("TOPLEFT", 22, -60)
+        col:SetPoint("TOPLEFT", i == 1 and 30 or 36, -60)
         col:SetSize(350, 360)
         col.y = 0
         columns[i] = col
