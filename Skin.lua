@@ -61,20 +61,25 @@ local DARK = {
 -- colors per style
 local PALETTE = {
     journal = {
-        text = { 0.25, 0.1484375, 0.02 },     -- the journal's brown body text (GameFontBlack)
-        dim = { 0.43, 0.32, 0.18 },
-        key = { 0.42, 0.22, 0.03 },
-        title = { 0.902, 0.788, 0.671 },      -- page titles on the dark header band
-        boss = { 0.827, 0.659, 0.463 },       -- names on boss buttons
-        bossSub = { 0.62, 0.52, 0.4 },
+        -- ink on the parchment
+        text = { 0.18, 0.1, 0.02 },           -- dark brown body text
+        dim = { 0.33, 0.22, 0.1 },
+        key = { 0.42, 0.18, 0.0 },
+        good = { 0.05, 0.36, 0.02 }, warn = { 0.5, 0.25, 0 }, off = { 0.4, 0.35, 0.3 },
+        -- light text on the dark bands, boss buttons and loot frames
+        title = { 0.96, 0.87, 0.72 },         -- page titles on the header band
+        boss = { 1, 0.86, 0.6 },              -- names on boss buttons
+        bossSub = { 0.9, 0.82, 0.68 },
         header = { 1, 0.82, 0 },              -- text on paper headers
-        good = { 0.1, 0.42, 0.06 }, warn = { 0.55, 0.33, 0 }, off = { 0.47, 0.42, 0.36 },
-        you = { 0.05, 0.25, 0.5 },
+        lootSub = { 0.88, 0.8, 0.66 },
+        lootMid = { 1, 0.92, 0.7 },
+        you = { 0.55, 0.85, 1 },
     },
     dark = {
-        text = { 0.9, 0.9, 0.9 }, dim = { 0.6, 0.6, 0.6 }, key = { 1, 0.82, 0 },
-        title = { 1, 0.82, 0 }, boss = { 1, 0.85, 0.6 }, bossSub = { 0.65, 0.65, 0.65 }, header = { 1, 0.82, 0 },
-        good = { 0.4, 1, 0.4 }, warn = { 1, 0.82, 0 }, off = { 0.5, 0.5, 0.5 }, you = { 0.53, 0.8, 1 },
+        text = { 0.9, 0.9, 0.9 }, dim = { 0.65, 0.65, 0.65 }, key = { 1, 0.82, 0 },
+        title = { 1, 0.82, 0 }, boss = { 1, 0.86, 0.6 }, bossSub = { 0.75, 0.75, 0.75 }, header = { 1, 0.82, 0 },
+        good = { 0.4, 1, 0.4 }, warn = { 1, 0.82, 0 }, off = { 0.55, 0.55, 0.55 }, you = { 0.55, 0.85, 1 },
+        lootSub = { 0.75, 0.75, 0.75 }, lootMid = { 1, 0.92, 0.7 },
     },
 }
 
@@ -86,9 +91,16 @@ function Skin.C(name)
     return (Skin.Journal() and PALETTE.journal or PALETTE.dark)[name]
 end
 
-function Skin.Color(fs, name)
-    local c = Skin.C(name)
+-- Colors a FontString. Dark ink on parchment gets no drop shadow (it smudges); light text keeps one.
+function Skin.Ink(fs, c)
     fs:SetTextColor(c[1], c[2], c[3])
+    if fs.SetShadowColor then
+        if c[1] + c[2] + c[3] < 1.3 then fs:SetShadowColor(0, 0, 0, 0) else fs:SetShadowColor(0, 0, 0, 1) end
+    end
+end
+
+function Skin.Color(fs, name)
+    Skin.Ink(fs, Skin.C(name))
 end
 
 function Skin.Hex(name)

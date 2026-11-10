@@ -233,7 +233,7 @@ end
 ------------------------------------------------------------------------------
 
 local function TextColor(fs, c, default)
-    if type(c) == "table" then fs:SetTextColor(c[1], c[2], c[3])
+    if type(c) == "table" then Skin.Ink(fs, c)
     else Skin.Color(fs, c or default or "text") end
 end
 
@@ -319,7 +319,8 @@ B.boss = {
         return b
     end,
     set = function(b, r, width)
-        b:SetWidth(math.min(325, width))
+        local w = math.max(260, width - 8)
+        b:SetWidth(w)
         b.name:SetText(r.text or "")
         TextColor(b.name, r.color, "boss")
         b.sub:SetText(r.sub or "")
@@ -328,7 +329,7 @@ B.boss = {
         Skin.Color(b.right, "boss")
         b.sel:SetShown(r.selected and true or false)
         Skin.SetPortrait(b.portrait, r.portrait, r.icon)
-        return 55, math.floor((width - math.min(325, width)) / 2)
+        return 55, math.floor((width - w) / 2)
     end,
     gap = 2,
 }
@@ -354,18 +355,18 @@ local function LootRow(parent, round)
     end
     b.name = W.Text(b, W.Font("GameFontNormalMed3", "GameFontNormal"))
     b.name:SetPoint("TOPLEFT", 51, -7)
-    b.name:SetPoint("RIGHT", -70, 0)
+    b.name:SetPoint("RIGHT", -110, 0)
     b.name:SetJustifyH("LEFT")
     b.name:SetWordWrap(false)
-    b.sub = W.Text(b, W.Font("GameFontBlack", "GameFontHighlightSmall"))
+    b.sub = W.Text(b, "GameFontHighlightSmall")
     b.sub:SetPoint("BOTTOMLEFT", 51, 7)
-    b.sub:SetPoint("RIGHT", -90, 0)
+    b.sub:SetPoint("RIGHT", -130, 0)
     b.sub:SetJustifyH("LEFT")
     b.sub:SetWordWrap(false)
     b.mid = W.Text(b, W.Font("GameFontNormalMed3", "GameFontNormal"))
     b.mid:SetPoint("TOPRIGHT", -10, -7)
     b.mid:SetJustifyH("RIGHT")
-    b.right = W.Text(b, W.Font("GameFontBlack", "GameFontHighlightSmall"))
+    b.right = W.Text(b, "GameFontHighlightSmall")
     b.right:SetPoint("BOTTOMRIGHT", -10, 7)
     b.right:SetJustifyH("RIGHT")
     Interactive(b)
@@ -373,18 +374,20 @@ local function LootRow(parent, round)
 end
 
 local function SetLootRow(b, r, width, round)
-    b:SetWidth(math.min(321, width))
+    local w = math.max(260, width - 4)
+    b:SetWidth(w)
+    b.bg:SetWidth(w)
     if round then Skin.SetPortrait(b.icon, r.portrait, r.icon)
     else W.SetIcon(b.icon, r.icon) end
     b.name:SetText(r.text or "")
-    TextColor(b.name, r.color, "text")
+    TextColor(b.name, r.color, "boss")
     b.sub:SetText(r.sub or "")
-    Skin.Color(b.sub, "dim")
+    Skin.Color(b.sub, "lootSub")
     b.mid:SetText(r.mid or "")
-    Skin.Color(b.mid, "text")
+    Skin.Color(b.mid, "lootMid")
     b.right:SetText(r.right or "")
     Skin.Color(b.right, "you")
-    return 45, math.floor((width - math.min(321, width)) / 2)
+    return 45, math.floor((width - w) / 2)
 end
 
 B.item = { new = function(p) return LootRow(p, false) end, set = function(b, r, w) return SetLootRow(b, r, w, false) end, gap = 3 }
@@ -532,7 +535,7 @@ B.line = {
         b.right:SetText(r.right or "")
         TextColor(b.right, r.rightColor, "key")
         b:EnableMouse((r.onClick or r.tooltip) and true or false)
-        return 24, 0
+        return 24, 4
     end,
     gap = 0,
 }
@@ -624,7 +627,7 @@ function W.Flow(parent)
     function list:SetRows(rows, keepScroll)
         self.rows = rows or {}
         local used = {}
-        local width = math.max(200, (self.width or self:GetWidth() or 360) - 18)
+        local width = math.max(200, (self.width or self:GetWidth() or 360) - 24)
         self.child:SetWidth(width)
         local y = 0
         for i, r in ipairs(self.rows) do

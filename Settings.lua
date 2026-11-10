@@ -36,10 +36,13 @@ function SB.CreateSettingsPage(parent)
     local columns = {}
     for i = 1, 2 do
         local half = CreateFrame("Frame", nil, page)
-        half:SetSize(i == 1 and 392 or 393, 425)
         half:SetPoint(i == 1 and "TOPLEFT" or "TOPRIGHT")
-        local band = Skin.New(half, i == 1 and "LeftPageHeader" or "RightPageHeader", "BACKGROUND", 3, true)
+        half:SetPoint(i == 1 and "BOTTOMLEFT" or "BOTTOMRIGHT")
+        half:SetWidth(392)
+        local band = Skin.New(half, i == 1 and "LeftPageHeader" or "RightPageHeader", "BACKGROUND", 3)
         band:SetPoint(i == 1 and "TOPLEFT" or "TOPRIGHT", 0, -11)
+        band:SetPoint(i == 1 and "RIGHT" or "LEFT", i == 1 and -6 or 6, 0)
+        band:SetHeight(39)
         local title = W.Text(half, "GameFontNormalLarge")
         title:SetPoint("TOPLEFT", 26, -24)
         title:SetText(i == 1 and "Mob tooltips" or "Item tooltips")
@@ -114,6 +117,11 @@ function SB.CreateSettingsPage(parent)
     Place(c2, reset, 0, 0)
     local forget = W.Button(c2, "Forget my bestiary...", 150, 22, function() StaticPopup_Show("TOTALINTEL_FORGET") end)
     forget:SetPoint("LEFT", reset, "RIGHT", 8, 0)
+
+    function page:Layout(halfWidth)
+        self.half1:SetWidth(halfWidth)
+        self.half2:SetWidth(halfWidth)
+    end
 
     function page:Refresh()
         for _, c in ipairs(self.controls) do if c.Refresh then c:Refresh() end end

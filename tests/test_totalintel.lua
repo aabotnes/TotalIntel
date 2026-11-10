@@ -257,6 +257,10 @@ check(true, "settings page and style switch work")
 SB.ShowLink("npc", HOGGER, "Hogger")
 check(TotalIntelLinkFrame and TotalIntelLinkFrame.edit:GetText() == "https://www.wowhead.com/forever/npc=448", "Wowhead link popup")
 
+C_TooltipInfo = { GetHyperlink = function(link)
+    if link:find("%-11867%-") then return { lines = { { leftText = "Woo Ping" } } } end
+end }
+check(SB.NpcName(11867) == "Woo Ping", "names the database lacks come from the client's creature cache")
 SB.OpenNpc(999999)
 check(SB.CurrentPage().id == 999999, "unknown NPC page doesn't error")
 M.Advance(5)

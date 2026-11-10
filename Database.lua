@@ -341,6 +341,16 @@ local function HasFlag(flags, bitValue)
     return math.floor(flags / bitValue) % 2 == 1
 end
 
+-- The name the game client has cached for a creature (any NPC you or the client has seen).
+local function ClientNpcName(id)
+    if not (C_TooltipInfo and C_TooltipInfo.GetHyperlink) then return nil end
+    local ok, data = pcall(C_TooltipInfo.GetHyperlink, ("unit:Creature-0-0-0-0-%d-0000000000"):format(id))
+    local line = ok and type(data) == "table" and data.lines and data.lines[1]
+    local name = line and SB.Public(line.leftText)
+    if type(name) == "string" and name ~= "" and not name:find("^Unknown") then return name end
+end
+SB.ClientNpcName = ClientNpcName
+
 -- A table describing the NPC (nil if nothing at all is known about it).
 function SB.GetNpc(id)
     id = tonumber(id)
@@ -350,9 +360,10 @@ function SB.GetNpc(id)
     local c = Classic(id)
     local name = N(id, "name")
     local seen = SB.db and SB.db.mobs[id]
+    if not name then name = (seen and seen.name) or ClientNpcName(id) end
     if not name and not c and not seen then npcCache[id] = false return nil end
     local n = {
-        id = id, name = name or (seen and seen.name) or ("NPC #" .. id), sub = N(id, "subName"),
+        id = id, name = name or ("NPC #" .. id), sub = N(id, "subName"),
         minLevel = N(id, "minLevel") or 0, maxLevel = N(id, "maxLevel") or 0,
         rank = N(id, "rank") or (c and c.rank) or 0,
         type = c and c.type or 0, family = c and c.family or 0,
@@ -375,7 +386,8 @@ function SB.GetNpc(id)
     n.flightMaster = HasFlag(npcFlags, F.FLIGHT_MASTER)
     n.repair = HasFlag(npcFlags, F.REPAIR)
     n.zones = Zones(id, c)
-    npcCache[id] = n
+    -- keep asking the client for a name it hasn't cached yet
+    if name then npcCache[id] = n end
     return n
 end
 

@@ -7,7 +7,9 @@ local _, SB = ...
 local W, Skin = SB.W, SB.Skin
 local Text, Button = W.Text, W.Button
 
-local WIDTH, HEIGHT = 800, 496
+local WIDTH, HEIGHT = 980, 640          -- default size; drag the corner to resize (remembered)
+local MIN_W, MIN_H, MAX_W, MAX_H = 800, 496, 1600, 1100
+local TOP = 69                          -- height of the title + navigation bar above the book
 local ui
 local state = { mode = "recent", page = nil, tab = "overview", history = {}, expanded = {} }
 
@@ -79,7 +81,7 @@ local function ItemRow(id, mid, right, sub)
         if it.req and it.req > 1 then parts[#parts + 1] = "Requires level " .. it.req end
         sub = table.concat(parts, " · ")
     end
-    return { kind = "item", id = id, icon = SB.ItemIcon(id), text = SB.ItemText(id, true, true), mid = mid, right = right,
+    return { kind = "item", id = id, icon = SB.ItemIcon(id), text = SB.ItemText(id, true), mid = mid, right = right,
              sub = sub, onClick = function() SB.OpenItem(id) end }
 end
 
@@ -453,7 +455,7 @@ end
 local function ItemOverview(id)
     local it = SB.GetItem(id)
     local rows = { Header("Overview") }
-    if it.quality then rows[#rows + 1] = KV("Quality", "|cff" .. (SB.QUALITY_HEX[it.quality] or "ffffff") .. (SB.QUALITY_NAMES[it.quality] or "?") .. "|r") end
+    if it.quality then rows[#rows + 1] = KV("Quality", SB.QUALITY_NAMES[it.quality] or "?") end
     if it.ilvl and it.ilvl > 0 then rows[#rows + 1] = KV("Item level", tostring(it.ilvl)) end
     if it.req and it.req > 0 then rows[#rows + 1] = KV("Requires level", tostring(it.req)) end
     rows[#rows + 1] = KV("Item ID", tostring(id))
@@ -780,8 +782,9 @@ end
 
 local function GridRows(raid)
     local rows, row = {}, nil
+    local perRow = math.max(2, math.floor(((ui.gridList.width or 775) - 10) / 188))
     for _, inst in ipairs(SB.Instances(raid)) do
-        if not row or #row.tiles == 4 then
+        if not row or #row.tiles == perRow then
             row = { kind = "tiles", tiles = {} }
             rows[#rows + 1] = row
         end
@@ -944,11 +947,11 @@ local function CreateUI()
     ui.back:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ui.nav = Text(ui, "GameFontNormal")
     ui.nav:SetPoint("LEFT", ui.back, "RIGHT", 6, 0)
-    ui.nav:SetPoint("RIGHT", ui, "TOPRIGHT", -230, -44)
+    ui.nav:SetPoint("RIGHT", ui, "TOPRIGHT", -260, -44)
     ui.nav:SetJustifyH("LEFT")
     ui.nav:SetWordWrap(false)
 
-    ui.search = W.Input(ui, 190, "Search mobs and items")
+    ui.search = W.Input(ui, 220, "Search")
     ui.search:SetPoint("TOPRIGHT", -20, -34)
     ui.search:SetScript("OnTextChanged", function(self, user)
         if not user then return end
@@ -966,7 +969,7 @@ local function CreateUI()
 
     -- the open book
     local info = CreateFrame("Frame", nil, ui)
-    info:SetSize(785, 425)
+    info:SetPoint("TOPLEFT", 14, -TOP)
     info:SetPoint("BOTTOMRIGHT", -1, 2)
     local bg = Skin.New(info, "JournalBG", "BACKGROUND")
     bg:SetAllPoints()
@@ -978,9 +981,12 @@ local function CreateUI()
 
     local left = CreateFrame("Frame", nil, book)
     left:SetPoint("TOPLEFT")
-    left:SetSize(392, 425)
-    local lh = Skin.New(left, "LeftPageHeader", "BACKGROUND", 3, true)
+    left:SetPoint("BOTTOMLEFT")
+    ui.left = left
+    local lh = Skin.New(left, "LeftPageHeader", "BACKGROUND", 3)
     lh:SetPoint("TOPLEFT", 0, -11)
+    lh:SetPoint("RIGHT", -6, 0)
+    lh:SetHeight(39)
     ui.leftTitle = Text(left, "GameFontNormalLarge")
     ui.leftTitle:SetPoint("TOPLEFT", 26, -24)
     ui.leftTitle:SetPoint("RIGHT", -60, 0)
@@ -993,20 +999,23 @@ local function CreateUI()
     ui.leftList = W.Flow(left)
     ui.leftList:SetPoint("TOPLEFT", 10, -58)
     ui.leftList:SetPoint("BOTTOMRIGHT", -6, 8)
-    ui.leftList.width = 376
+
 
     local right = CreateFrame("Frame", nil, book)
     right:SetPoint("TOPRIGHT")
-    right:SetSize(393, 425)
+    right:SetPoint("BOTTOMRIGHT")
+    right:SetPoint("LEFT", left, "RIGHT")
     ui.right = right
-    local rh = Skin.New(right, "RightPageHeader", "BACKGROUND", 3, true)
+    local rh = Skin.New(right, "RightPageHeader", "BACKGROUND", 3)
     rh:SetPoint("TOPRIGHT", 0, -11)
+    rh:SetPoint("LEFT", 6, 0)
+    rh:SetHeight(39)
     ui.rightTitle = Text(right, "GameFontNormalLarge")
     ui.rightTitle:SetPoint("TOPLEFT", 24, -24)
     ui.rightTitle:SetPoint("RIGHT", -20, 0)
     ui.rightTitle:SetJustifyH("LEFT")
     ui.rightTitle:SetWordWrap(false)
-    ui.rightSub = Text(right, W.Font("GameFontBlack", "GameFontHighlight"))
+    ui.rightSub = Text(right, "GameFontHighlight")
     ui.rightSub:SetPoint("TOPLEFT", 24, -58)
     ui.rightSub:SetPoint("RIGHT", -20, 0)
     ui.rightSub:SetJustifyH("LEFT")
@@ -1023,15 +1032,14 @@ local function CreateUI()
     ui.content = W.Flow(right)
     ui.content:SetPoint("TOPLEFT", 12, -118)
     ui.content:SetPoint("BOTTOMRIGHT", -8, 8)
-    ui.content.width = 372
+
 
     -- model view, like the journal's model tab
     local mv = CreateFrame("Frame", nil, right)
     mv:SetAllPoints()
     mv:SetFrameLevel(right:GetFrameLevel() + 5)
     local mbg = Skin.New(mv, "DungeonBG", "BACKGROUND", 1)
-    mbg:SetPoint("BOTTOMLEFT", 0, 0)
-    mbg:SetSize(393, 425)
+    mbg:SetAllPoints()
     local okModel, model = pcall(CreateFrame, "PlayerModel", nil, mv)
     if not okModel then model = CreateFrame("Frame", nil, mv) end
     model:SetPoint("TOPLEFT", 4, -4)
@@ -1113,15 +1121,15 @@ local function CreateUI()
     -- instance grid (both pages)
     local grid = CreateFrame("Frame", nil, info)
     grid:SetAllPoints()
-    local gh = Skin.New(grid, "LeftPageHeader", "BACKGROUND", 3, true)
+    local gh = Skin.New(grid, "LeftPageHeader", "BACKGROUND", 3)
     gh:SetPoint("TOPLEFT", 0, -11)
+    gh:SetSize(386, 39)
     ui.gridTitle = Text(grid, "GameFontNormalLarge")
     ui.gridTitle:SetPoint("TOPLEFT", 26, -24)
     Skin.Color(ui.gridTitle, "title")
     ui.gridList = W.Flow(grid)
     ui.gridList:SetPoint("TOPLEFT", 4, -60)
     ui.gridList:SetPoint("BOTTOMRIGHT", -6, 8)
-    ui.gridList.width = 775
     grid:Hide()
     ui.grid = grid
 
@@ -1165,7 +1173,51 @@ local function CreateUI()
     if PanelTemplates_SetNumTabs then pcall(PanelTemplates_SetNumTabs, ui, #BOTTOM_TABS) end
     ui.selectedTab = 1
 
+    -- resizing: drag the bottom-right corner
+    ui:SetResizable(true)
+    if ui.SetResizeBounds then ui:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
+    elseif ui.SetMinResize then ui:SetMinResize(MIN_W, MIN_H); ui:SetMaxResize(MAX_W, MAX_H) end
+    local grip = CreateFrame("Button", nil, ui)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -3, 3)
+    grip:SetFrameLevel((ui:GetFrameLevel() or 1) + 20)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetScript("OnMouseDown", function() ui:StartSizing("BOTTOMRIGHT") end)
+    grip:SetScript("OnMouseUp", function()
+        ui:StopMovingOrSizing()
+        SB.db.window = { w = math.floor(ui:GetWidth() + 0.5), h = math.floor(ui:GetHeight() + 0.5) }
+        SB.Layout()
+        DrawPage(true)
+    end)
+    grip:SetScript("OnEnter", function(self) W.Tooltip(self, "Drag to resize") end)
+    grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local saved = SB.db.window
+    if saved and saved.w and saved.h then
+        ui:SetSize(math.max(MIN_W, math.min(MAX_W, saved.w)), math.max(MIN_H, math.min(MAX_H, saved.h)))
+    end
+    local relayout
+    ui:SetScript("OnSizeChanged", function()
+        if relayout then return end
+        relayout = true
+        SB.After(0.05, function() relayout = false; SB.Layout(); if ui:IsShown() then DrawPage(true) end end)
+    end)
+    SB.Layout()
+
     ui:SetScript("OnShow", function() DrawPage(true) end)
+end
+
+-- Sizes the two pages and every list to the window.
+function SB.Layout()
+    if not ui then return end
+    local w = (ui:GetWidth() or WIDTH) - 15
+    local half = math.floor(w / 2)
+    ui.left:SetWidth(half)
+    ui.leftList.width = half - 16
+    ui.content.width = (w - half) - 20
+    ui.gridList.width = w - 10
+    if ui.settingsPage.Layout then ui.settingsPage:Layout(half) end
 end
 
 ------------------------------------------------------------------------------

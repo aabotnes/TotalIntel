@@ -38,6 +38,7 @@ It's an open book, like the Adventure Guide:
 - **Search** (top right): any mob or item by name or ID.
 - **Bottom tabs:** Recent, Zone, Bestiary, **Dungeons**, **Raids** and Settings. Dungeons and Raids show every instance as a tile with the Adventure Guide's artwork. Click one for its bosses, its other inhabitants and its boss loot.
 - **Back arrow** (top left) and the path next to it show where you are.
+- **Resize** the journal by dragging its bottom-right corner. It remembers the size.
 
 **Mob tabs**
 - **Overview:** type, health, mana, coin, services, where it spawns (click a zone for a map pin), your record, and its best drops.
