@@ -117,15 +117,43 @@ function Q.ForNpc(npcId, unitName)
             end
         end
     end
-    -- quests the database doesn't know (new in Forever): match "Mob slain" objectives by name
+    -- quests the game itself showed on this mob's tooltip
+    local m = SB.db and SB.db.mobs[npcId]
+    for qid in pairs(m and m.q or {}) do
+        local entry = Q.active[qid]
+        if entry and not seen[qid] then
+            seen[qid] = true
+            local kill = FindObjective(entry, name, "monster")
+            out[#out + 1] = { entry = entry, kind = kill and "kill" or "game", objective = kill }
+        end
+    end
+    -- quests the database doesn't know (new in Forever): match "Mob slain" objectives by name,
+    -- and item objectives by the names of what it drops
     if name then
         local lname = name:lower()
         for id, entry in pairs(Q.active) do
             if not seen[id] and not SB.GetQuest(id) then
+                local matched = false
                 for _, o in ipairs(entry.objectives) do
                     if o.type == "monster" and o.text:lower():find(lname, 1, true) then
                         out[#out + 1] = { entry = entry, kind = "kill", objective = o }
+                        matched = true
                         break
+                    end
+                end
+                if not matched then
+                    for _, o in ipairs(entry.objectives) do
+                        if o.type == "item" and not matched then
+                            local text = o.text:lower()
+                            for _, drop in ipairs(SB.GetLoot(npcId)) do
+                                local it = SB.GetItem(drop.item)
+                                if it.link and text:find(it.name:lower(), 1, true) then
+                                    out[#out + 1] = { entry = entry, kind = "loot", item = drop.item, chance = drop.chance, objective = o }
+                                    matched = true
+                                    break
+                                end
+                            end
+                        end
                     end
                 end
             end

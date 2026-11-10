@@ -59,6 +59,25 @@ function SB.AddRecent(id)
     for i = #r, MAX_RECENT + 1, -1 do r[i] = nil end
 end
 
+-- The quests the game itself attaches to this unit (its tooltip's quest lines carry quest IDs).
+-- This is the client's own answer, so it covers Forever-only quests too.
+local QUEST_TITLE = 17
+local function LearnQuests(unit, m)
+    if not (C_TooltipInfo and C_TooltipInfo.GetUnit) then return end
+    local ok, data = pcall(C_TooltipInfo.GetUnit, unit)
+    if not ok or type(data) ~= "table" or type(data.lines) ~= "table" then return end
+    local questType = Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.QuestTitle or QUEST_TITLE
+    for _, line in ipairs(data.lines) do
+        local kind = Public(line.type)
+        local id = Public(line.id)
+        if kind == questType and type(id) == "number" and id > 0 then
+            m.q = m.q or {}
+            m.q[id] = true
+        end
+    end
+end
+SB.LearnQuests = LearnQuests
+
 local function SeeUnit(unit, recent)
     if not SB.db or not SB.db.learn then return end
     local id = SB.UnitNpcId(unit)
@@ -71,6 +90,7 @@ local function SeeUnit(unit, recent)
     local lv = SB.Public(UnitLevel(unit))
     if lv and lv > 0 then m.lv = lv end
     if SB.ForgetNpc then SB.ForgetNpc(id) end
+    LearnQuests(unit, m)
     if recent then
         SB.AddRecent(id)
         SB.lastTarget = id

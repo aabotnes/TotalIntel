@@ -10,7 +10,8 @@ Total Intel follows the current version of Forever instead of shipping its own c
 
 | What | Where it comes from |
 |---|---|
-| NPCs, levels, spawn points, quests, who drops and sells each item, zones, instances | **QuestieDB**, read live in the game. It's the database addon behind Questie and is updated along with Forever. |
+| NPCs, levels, spawn points, quests, who drops and sells each item, zones, instances | **Questie's database**, read live in the game: the QuestieDB addon, or the database built into Questie. It's updated along with Forever. |
+| Which quests a mob is for | also the **game client**: the quest lines on a mob's tooltip carry quest IDs, so every mob you target or mouse over teaches Total Intel its quests, Forever-only ones included |
 | Item names, quality, item levels (Forever-only items included), spells, zone names | the **game client** |
 | Recipes: profession, skill, reagents, how it's learned | the **game client's profession window**: see [Crafting](#crafting) |
 | Dungeon and raid artwork and lore | the game's **Adventure Guide** |
@@ -19,7 +20,7 @@ Total Intel follows the current version of Forever instead of shipping its own c
 
 ## Install
 
-1. Install **QuestieDB** (it comes with Questie). Without it, tooltips still show Classic loot and abilities, but spawns, quests and "dropped by" need it.
+1. Have **Questie** installed (or the QuestieDB addon). Total Intel reads its database. Without it, tooltips still show Classic loot and abilities, but spawns, quest lists and "dropped by" need it. `/tits status` shows which database was found.
 2. Unzip Total Intel into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`.
 3. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
 
@@ -33,7 +34,8 @@ Total Intel follows the current version of Forever instead of shipping its own c
 
 It's an open book, like the Adventure Guide:
 
-- **Left page:** a list. **Recent** (your recent targets), **Zone** (every mob in your zone, bosses first), **Bestiary** (everything you've killed), search results, or an instance's bosses and inhabitants. Each mob has its portrait.
+- **Left page:** a list. **Recent** (your recent targets), **Zone**, **Bestiary** (everything you've killed), search results, or an instance's bosses and inhabitants. Each mob has its portrait.
+- **Zone** lists every mob in the zone you're in, grouped: *For your quests* first, then *Bosses, elites & rares*, *Creatures* and *Friendly NPCs*. Mobs you've seen there are always included, even ones no database knows.
 - **Right page:** the mob, item or instance you picked, with the journal's tabs down the right edge.
 - **Search** (top right): any mob or item by name or ID.
 - **Bottom tabs:** Recent, Zone, Bestiary, **Dungeons**, **Raids** and Settings. Dungeons and Raids show every instance as a tile with the Adventure Guide's artwork. Click one for its bosses, its other inhabitants and its boss loot.
@@ -92,6 +94,7 @@ Open them with `/tits options`, the Settings tab, or **Options → AddOns**. The
 | `/tits options` | settings |
 | `/tits link` | Wowhead link for your target |
 | `/tits learn` | turn recording kills, loot and spells on or off |
+| `/tits status` | which database was found, and what's loaded (handy for bug reports) |
 | `/tits minimap` | hide or show the minimap button |
 
 `/totalintel` works too.

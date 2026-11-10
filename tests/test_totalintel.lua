@@ -279,4 +279,58 @@ check(Has(lines, "Abilities:"), "without QuestieDB: tooltips still show abilitie
 LibQuestieDB = saved
 SB.ResetSources()
 
+------------------------------------------------------------------------------
+-- Questie's built-in database (Questie releases without the separate QuestieDB addon)
+------------------------------------------------------------------------------
+saved = LibQuestieDB
+LibQuestieDB = nil
+local ready = false
+local qdbModule = { NPCPointers = { [448] = 1, [240] = 1 }, ItemPointers = { [1931] = 1 }, QuestPointers = { [176] = 1 } }
+qdbModule.QueryNPCSingle = function(id, key) if not ready then error("not initialized") end return saved.Npc.Get(id, key) end
+qdbModule.QueryItemSingle = function(id, key) return saved.Item.Get(id, key) end
+qdbModule.QueryQuestSingle = function(id, key) return saved.Quest.Get(id, key) end
+QuestieLoader = { ImportModule = function(_, name)
+    if name == "QuestieDB" then return qdbModule end
+    return saved.Support.Get(name)
+end }
+SB.ResetSources()
+check(SB.QDB() == nil, "Questie's database isn't used before Questie has loaded it")
+ready = true
+M.Advance(4)
+check(SB.QDB() and SB.dataSource == "Questie", "Questie's built-in database is found once it's ready")
+SB.BuildIndex(true)
+check(SB.GetNpc(HOGGER).zones[1].area == 12 and SB.GetQuest(176).items[1] == CLAW, "spawns and quests read through Questie's database")
+QuestieLoader = nil
+LibQuestieDB = saved
+SB.ResetSources()
+SB.BuildIndex(true)
+
+------------------------------------------------------------------------------
+-- Quests the game shows on a mob's tooltip
+------------------------------------------------------------------------------
+C_TooltipInfo = { GetUnit = function(unit)
+    if unit == "target" then return { lines = { { type = 2 }, { type = 17, id = 99001 }, { type = 8 } } } end
+end }
+M.units.target = { guid = "Creature-0-1-0-1-735-0000000002", name = "Murloc Streamrunner", level = 6 }
+M.quests[#M.quests + 1] = { id = 99001, title = "Forever: Murloc Menace", complete = false,
+    objectives = { { text = "Murloc Streamrunner slain: 2/8", type = "monster", finished = false, numFulfilled = 2, numRequired = 8 } } }
+M.Fire("QUEST_LOG_UPDATE")
+M.Fire("PLAYER_TARGET_CHANGED")
+check(SB.db.mobs[735].q and SB.db.mobs[735].q[99001], "learns quest IDs from the game's tooltip data")
+local rel = SB.QuestLog.ForNpc(735)
+check(rel[1] and rel[1].entry.id == 99001 and SB.QuestLog.ObjectiveText(rel[1].objective) == "2/8", "a Forever-only quest is matched with its progress")
+
+------------------------------------------------------------------------------
+-- Zone list without any database: mobs you've seen there, grouped
+------------------------------------------------------------------------------
+saved = LibQuestieDB
+LibQuestieDB = nil
+SB.ResetSources()
+SB.BuildIndex(true)
+SB.OpenZone()
+local zoneRows = SB.SidebarRows()
+check(RowsHave(zoneRows, "For your quests") and RowsHave(zoneRows, "Murloc Streamrunner"), "zone list groups mobs you've seen there, quest mobs first")
+LibQuestieDB = saved
+SB.ResetSources()
+
 print("ALL TESTS PASSED")

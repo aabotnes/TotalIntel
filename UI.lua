@@ -198,10 +198,46 @@ local function ListRows()
         if #rows == 0 then rows[1] = Note(SB.index.ready and "No mobs known for this instance." or "Reading the database...") end
     elseif mode == "zone" then
         local areas, label = SB.PlayerAreas()
-        local ids = SB.NpcsInAreas(areas)
+        local ids, have = {}, {}
+        for _, id in ipairs(SB.NpcsInAreas(areas)) do have[id] = true; ids[#ids + 1] = id end
+        -- plus every mob you've seen here, whether or not a database knows it
+        local here = GetZoneText and GetZoneText()
+        for id, m in pairs(SB.db.mobs) do
+            if not have[id] and m.z and (m.z == here or m.z == label) then have[id] = true; ids[#ids + 1] = id end
+        end
         title, count = label or "Zone", #ids
-        for _, id in ipairs(ids) do rows[#rows + 1] = NpcRow(id, "boss") end
-        if #rows == 0 then rows[1] = Note(SB.index.ready and "No mobs known for this zone." or "Reading the database...") end
+        local groups = {
+            { "For your quests", {} }, { "Bosses, elites & rares", {} }, { "Creatures", {} }, { "Friendly NPCs", {} },
+        }
+        for _, id in ipairs(ids) do
+            local n = SB.GetNpc(id)
+            local g
+            if #SB.QuestLog.ForNpc(id) > 0 then g = 1
+            elseif n and n.friendly then g = 4
+            elseif n and (n.boss or n.rank > 0) then g = 2
+            else g = 3 end
+            table.insert(groups[g][2], id)
+        end
+        for _, grp in ipairs(groups) do
+            table.sort(grp[2], function(a, b)
+                local na, nb = SB.GetNpc(a), SB.GetNpc(b)
+                local la, lb = na and na.maxLevel or 0, nb and nb.maxLevel or 0
+                if la ~= lb then return la < lb end
+                return SB.NpcName(a) < SB.NpcName(b)
+            end)
+            if #grp[2] > 0 then
+                rows[#rows + 1] = Header(grp[1], tostring(#grp[2]))
+                for _, id in ipairs(grp[2]) do rows[#rows + 1] = NpcRow(id, "boss") end
+            end
+        end
+        if #rows == 0 then
+            if not SB.QDB() then
+                rows[1] = Note("No mobs listed for " .. (label or "this zone") .. " yet.")
+                rows[2] = Note("The zone list needs Questie's database, and none was found. Type /tits status to see why. Until then it lists the mobs you target or mouse over here.")
+            else
+                rows[1] = Note(SB.index.ready and "No mobs known for this zone." or "Reading the database...")
+            end
+        end
     elseif mode == "bestiary" then
         local list = {}
         for id, m in pairs(SB.db.mobs) do if (m.k or 0) > 0 or (m.c or 0) > 0 then list[#list + 1] = id end end
@@ -403,7 +439,8 @@ local function NpcQuests(id, n)
     if #active > 0 then
         rows[#rows + 1] = Header("On your quests")
         for _, r in ipairs(active) do
-            local what = r.kind == "loot" and (SB.GetItem(r.item).name .. " " .. SB.Percent(r.chance)) or "kill"
+            local what = r.kind == "loot" and (SB.GetItem(r.item).name .. " " .. SB.Percent(r.chance))
+                or (r.kind == "kill" and "kill") or "shown by the game"
             rows[#rows + 1] = QuestRow(r.entry.id, SB.QuestLog.ObjectiveText(r.objective), what)
         end
     end
@@ -416,6 +453,9 @@ local function NpcQuests(id, n)
             seen[d.quest] = true
             needed[#needed + 1] = { q = d.quest, what = SB.GetItem(d.item).name }
         end
+    end
+    for q in pairs((SB.db.mobs[id] or {}).q or {}) do
+        if not SB.QuestLog.IsActive(q) and not seen[q] then seen[q] = true; needed[#needed + 1] = { q = q, what = "seen in game" } end
     end
     if #needed > 0 then
         rows[#rows + 1] = Header("Needed for")

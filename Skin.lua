@@ -63,8 +63,8 @@ local PALETTE = {
     journal = {
         -- ink on the parchment
         text = { 0.18, 0.1, 0.02 },           -- dark brown body text
-        dim = { 0.33, 0.22, 0.1 },
-        key = { 0.42, 0.18, 0.0 },
+        dim = { 0.28, 0.18, 0.08 },
+        key = { 0.3, 0.12, 0.0 },
         good = { 0.05, 0.36, 0.02 }, warn = { 0.5, 0.25, 0 }, off = { 0.4, 0.35, 0.3 },
         -- light text on the dark bands, boss buttons and loot frames
         title = { 0.96, 0.87, 0.72 },         -- page titles on the header band

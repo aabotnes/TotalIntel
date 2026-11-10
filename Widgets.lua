@@ -478,10 +478,11 @@ B.kv = {
         local f = CreateFrame("Frame", nil, parent)
         f.key = W.Text(f, W.Font("GameFontBlack", "GameFontHighlight"))
         f.key:SetPoint("TOPLEFT")
-        f.key:SetWidth(112)
+        f.key:SetWidth(130)
         f.key:SetJustifyH("LEFT")
+        f.key:SetWordWrap(false)
         f.value = W.Text(f, W.Font("GameFontBlack", "GameFontHighlight"))
-        f.value:SetPoint("TOPLEFT", 118, 0)
+        f.value:SetPoint("TOPLEFT", 136, 0)
         f.value:SetJustifyH("LEFT")
         f.value:SetJustifyV("TOP")
         return f
@@ -490,7 +491,7 @@ B.kv = {
         f:SetWidth(width - 12)
         f.key:SetText(r.key or "")
         Skin.Color(f.key, "key")
-        f.value:SetWidth(width - 12 - 126)
+        f.value:SetWidth(width - 12 - 144)
         f.value:SetText(r.text or "")
         TextColor(f.value, r.color, "text")
         local h = math.max(f.key:GetStringHeight() or 14, f.value:GetStringHeight() or 14) + 4

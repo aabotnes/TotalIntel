@@ -27,29 +27,75 @@ SB.RAID_MAPS = { [409] = true, [249] = true, [469] = true, [309] = true, [509] =
 ------------------------------------------------------------------------------
 
 local LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates
-local checked = false
+local lastTry = -100
+SB.dataSource = nil   -- "QuestieDB" (the LibQuestieDB addon) or "Questie" (Questie's built-in database)
 
--- The live database, if the QuestieDB addon is installed (and recent enough).
-function SB.QDB()
-    if checked then return LQ end
-    checked = true
-    local lib = _G.LibQuestieDB
-    if type(lib) ~= "table" or not lib.Npc then return nil end
-    if lib.RequireContract then
-        local ok, res = pcall(lib.RequireContract, 1)
-        if not ok or res == false then return nil end
+-- Questie's own database module (Questie releases that don't use the separate QuestieDB addon),
+-- wrapped to look like LibQuestieDB's entities. It only answers once Questie has finished
+-- loading it, a few seconds after login.
+local function QuestieBuiltIn()
+    local loader = _G.QuestieLoader
+    if type(loader) ~= "table" or not loader.ImportModule then return nil end
+    local ok, qdb = pcall(loader.ImportModule, loader, "QuestieDB")
+    if not ok or type(qdb) ~= "table" or type(qdb.QueryNPCSingle) ~= "function" then return nil end
+    local probe, name = pcall(qdb.QueryNPCSingle, 448, "name")
+    if not probe or type(name) ~= "string" then return nil end
+    local function Entity(query, pointers)
+        return {
+            Get = function(id, key) return query(id, key) end,
+            GetAllIds = function()
+                local ids = {}
+                for id in pairs(type(qdb[pointers]) == "table" and qdb[pointers] or {}) do ids[#ids + 1] = id end
+                table.sort(ids)
+                return ids
+            end,
+        }
     end
-    LQ, NpcDB, ItemDB, QuestDB = lib, lib.Npc, lib.Item, lib.Quest
-    if lib.Support and lib.Support.Get then
-        local ok, z = pcall(lib.Support.Get, "ZoneDB")
+    return {
+        Npc = Entity(qdb.QueryNPCSingle, "NPCPointers"),
+        Item = Entity(qdb.QueryItemSingle, "ItemPointers"),
+        Quest = Entity(qdb.QueryQuestSingle, "QuestPointers"),
+        Enum = { npcFlags = qdb.npcFlags },
+        Support = { Get = function(module)
+            local okm, m = pcall(loader.ImportModule, loader, module)
+            return okm and m or nil
+        end },
+    }
+end
+
+-- The live database: the QuestieDB addon (LibQuestieDB), or Questie's built-in one.
+-- Looked for again (every few seconds) until one answers, since Questie loads its data late.
+function SB.QDB()
+    if LQ then return LQ end
+    local now = GetTime and GetTime() or 0
+    if now - lastTry < 3 then return nil end
+    lastTry = now
+    local lib = _G.LibQuestieDB
+    if type(lib) == "table" and lib.Npc and lib.Item and lib.Quest then
+        local ok, res = true, true
+        if lib.RequireContract then ok, res = pcall(lib.RequireContract, 1) end
+        if ok and res ~= false then LQ, SB.dataSource = lib, "QuestieDB" end
+    end
+    if not LQ then
+        local q = QuestieBuiltIn()
+        if q then LQ, SB.dataSource = q, "Questie" end
+    end
+    if not LQ then return nil end
+    NpcDB, ItemDB, QuestDB = LQ.Npc, LQ.Item, LQ.Quest
+    if LQ.Support and LQ.Support.Get then
+        local ok, z = pcall(LQ.Support.Get, "ZoneDB")
         if ok then ZoneDB = z end
     end
+    -- found it after the first index was built: rebuild with the live data
+    if SB.ResetCaches then SB.ResetCaches() end
+    if SB.index and SB.index.built and SB.BuildIndex then SB.After(0.5, function() SB.BuildIndex() end) end
     return LQ
 end
 
 -- Forgets QuestieDB lookups (used by the tests to swap databases).
 function SB.ResetSources()
-    checked, LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates = false, nil, nil, nil, nil, nil, nil
+    LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates, lastTry = nil, nil, nil, nil, nil, nil, -100
+    SB.dataSource = nil
     SB.ResetCaches()
 end
 
@@ -272,6 +318,8 @@ local function Build(yield)
     end
     for k, v in pairs(n) do idx[k] = v end
     idx.ready = true
+    idx.built = true
+    idx.withData = SB.QDB() ~= nil
     if SB.OnIndexReady then SB.OnIndexReady() end
 end
 
@@ -291,7 +339,18 @@ function SB.BuildIndex(now)
         end
     end)
 end
-SB.On("PLAYER_LOGIN", function() SB.After(2, function() SB.BuildIndex() end) end)
+SB.On("PLAYER_LOGIN", function()
+    SB.After(2, function() SB.BuildIndex() end)
+    -- Questie fills its database a little after login; keep looking for two minutes
+    if C_Timer and C_Timer.NewTicker then
+        local tries = 0
+        local t
+        t = C_Timer.NewTicker(4, function()
+            tries = tries + 1
+            if SB.QDB() or tries > 30 then t:Cancel() end
+        end)
+    end
+end)
 
 ------------------------------------------------------------------------------
 -- NPCs
@@ -840,8 +899,8 @@ end
 
 -- Tell the player once when the live database is missing.
 SB.On("PLAYER_LOGIN", function()
-    if SB.QDB() then return end
-    SB.After(6, function()
-        SB.Print("|cffff8800QuestieDB isn't installed or is too old.|r Spawns, quests and \"dropped by\" need it - it comes with Questie. Tooltips still show Classic loot and abilities.")
+    SB.After(45, function()
+        if SB.QDB() then return end
+        SB.Print("|cffff8800no Questie database found.|r Spawns, quests and \"dropped by\" need Questie (or the QuestieDB addon). Tooltips still show Classic loot and abilities. Type |cffffd100/tits status|r for details.")
     end)
 end)

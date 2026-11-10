@@ -67,8 +67,10 @@ function SB.AddNpcLines(tt, id, unit)
             local what
             if r.kind == "loot" then
                 what = SB.ItemText(r.item, true) .. (r.chance and (" |cffaaaaaa" .. SB.Percent(r.chance) .. "|r") or "")
-            else
+            elseif r.kind == "kill" then
                 what = "kill"
+            else
+                what = ""
             end
             local left = (done and "|cff40c040" or "|cffffd100") .. QuestColorName(r.entry) .. "|r"
             AddDouble(tt, left, what .. (prog and ("  " .. prog) or ""), nil, done and GREEN or WHITE)

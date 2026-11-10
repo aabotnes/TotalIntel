@@ -216,6 +216,7 @@ local HELP = {
     "|cffffd100/tits link|r - Wowhead link for your target",
     "|cffffd100/tits minimap|r - hide or show the minimap button",
     "|cffffd100/tits learn|r - turn recording kills, loot and spells on or off",
+    "|cffffd100/tits status|r - where the data comes from, and what's loaded",
 }
 
 local function Slash(msg)
@@ -245,6 +246,8 @@ local function Slash(msg)
     elseif cmd == "learn" then
         SB.db.learn = not SB.db.learn
         SB.Print("recording kills, loot and spells is " .. (SB.db.learn and "|cff33ff33on|r" or "|cffff5555off|r") .. ".")
+    elseif cmd == "status" then
+        SB.Status()
     elseif cmd == "debug" then
         SB.debug = not SB.debug
         SB.Print("debug " .. (SB.debug and "on" or "off"))
@@ -256,6 +259,32 @@ end
 SLASH_TOTALINTEL1 = "/tits"
 SLASH_TOTALINTEL2 = "/totalintel"
 SlashCmdList.TOTALINTEL = Slash
+
+-- What's loaded, for bug reports.
+function SB.Status()
+    local q = SB.QDB()
+    SB.Print("status")
+    local function Line(label, value) DEFAULT_CHAT_FRAME:AddMessage("   |cffffd100" .. label .. ":|r " .. tostring(value)) end
+    if q then
+        Line("NPC/quest data", SB.dataSource == "Questie" and "Questie's built-in database" or "QuestieDB addon (LibQuestieDB)")
+    else
+        local why = _G.LibQuestieDB and "QuestieDB is loaded but didn't answer"
+            or (_G.QuestieLoader and "Questie is loaded but its database isn't ready (or is an unsupported version)")
+            or "neither Questie nor QuestieDB is loaded"
+        Line("NPC/quest data", "|cffff5555none|r - " .. why)
+    end
+    local idx = SB.index or {}
+    local npcs, items = 0, 0
+    for _ in pairs(idx.npcsInArea or {}) do npcs = npcs + 1 end
+    for _ in pairs(idx.itemFor or {}) do items = items + 1 end
+    Line("Index", (idx.ready and "ready" or "building...") .. (" (%d zones with mobs, %d quest items)"):format(npcs, items))
+    local mobs = 0
+    for _ in pairs(SB.db.mobs) do mobs = mobs + 1 end
+    Line("Your bestiary", SB.Plural(mobs, "mob"))
+    Line("Recipes read", SB.Crafting and SB.Crafting.Count() or 0)
+    local _, build, _, toc = GetBuildInfo()
+    Line("Game", tostring(build) .. " / " .. tostring(toc))
+end
 
 -- Key bindings (Bindings.xml)
 BINDING_HEADER_TOTALINTEL = "Total Intel"
