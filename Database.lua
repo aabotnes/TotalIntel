@@ -105,6 +105,30 @@ function SB.QDB()
     return LQ
 end
 
+-- Where NPC, quest and item data comes from right now, for the indicator in the window:
+-- label, live (true when a Questie database is being read), and lines explaining it.
+function SB.DataSource()
+    local db = SB.QDB()
+    if SB.dataSource == "QuestieDB" then
+        return "Data: live (QuestieDB)", true, {
+            "NPCs, quests, spawns and vendors are read live from the QuestieDB addon.",
+            "They update whenever QuestieDB updates.",
+        }
+    elseif SB.dataSource == "Questie" then
+        return "Data: live (Questie)", true, {
+            "NPCs, quests, spawns and vendors are read live from Questie's database.",
+            "They update whenever Questie updates.",
+        }
+    elseif db then
+        local date = db.info and db.info.date or "?"
+        return "Data: built-in snapshot", false, {
+            "NPCs, quests, spawns and vendors come from Total Intel's built-in snapshot of Forever (" .. date .. ").",
+            "Install |cffffffffQuestie|r or the |cffffffffQuestieDB|r addon for better data: Total Intel then reads their database instead, with newer quests, NPCs and spawn points whenever they update.",
+        }
+    end
+    return "Data: none", false, { "No NPC or quest database is loaded. Type /tits status for details." }
+end
+
 -- Forgets the database (used by the tests to swap databases).
 function SB.ResetSources()
     LQ, NpcDB, ItemDB, QuestDB, ZoneDB, DropRates, lastTry = nil, nil, nil, nil, nil, nil, -100

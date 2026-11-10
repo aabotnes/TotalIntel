@@ -273,6 +273,9 @@ LibQuestieDB = nil
 SB.ResetSources()
 SB.BuildIndex(true)
 check(SB.QDB() and SB.dataSource == "bundled", "without Questie, the bundled snapshot of Forever data is used")
+local srcLabel, srcLive, srcLines = SB.DataSource()
+check(srcLabel == "Data: built-in snapshot" and not srcLive and table.concat(srcLines, " "):find("Questie"),
+    "the window's data indicator says snapshot and hints at Questie and QuestieDB")
 local MURLOC = 735
 local murloc = SB.GetNpc(MURLOC)
 check(murloc.name == "Murloc Streamrunner" and murloc.minLevel == 6 and murloc.zones[1].area == 12 and murloc.zones[1].count == 20,
@@ -300,6 +303,7 @@ check(Has(lines, "Abilities:"), "tooltips work on the snapshot", lines)
 LibQuestieDB = saved
 SB.ResetSources()
 check(SB.QDB() and SB.dataSource == "QuestieDB", "a live QuestieDB is preferred when it's installed")
+check(SB.DataSource() == "Data: live (QuestieDB)" and select(2, SB.DataSource()), "the indicator says live when QuestieDB is read")
 
 ------------------------------------------------------------------------------
 -- Loot tab: filter by rarity

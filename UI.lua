@@ -1019,6 +1019,10 @@ local function DrawPageNow(keep)
     if not ui then return end
     local mode = state.mode
     ui.nav:SetText(Breadcrumb())
+    local label, live = SB.DataSource()
+    ui.source.text:SetText(label)
+    if live then ui.source.text:SetTextColor(0.35, 1, 0.35) else ui.source.text:SetTextColor(1, 0.72, 0.25) end
+    ui.source:SetWidth((ui.source.text:GetStringWidth() or 120) + 8)
     DrawBottomTabs()
     ui.grid:Hide(); ui.settingsPage:Hide(); ui.book:Hide()
     if mode == "settings" then
@@ -1049,6 +1053,9 @@ local function DrawPageNow(keep)
             Header("Welcome"),
             { kind = "text", text = "Pick a mob on the left, or open Dungeons and Raids below." },
             { kind = "text", text = "Search (top right) finds any mob, NPC or item by name or ID, whether you've seen it or not. /tits <name> does the same." },
+            { kind = "text", text = select(2, SB.DataSource())
+                and "NPC and quest data is read live from Questie, so it updates whenever Questie does."
+                or "Tip: install Questie or the QuestieDB addon for better data. Total Intel then reads their database instead of its built-in snapshot, with newer quests, NPCs and spawn points. The \"Data:\" label at the top shows which is in use." },
             { kind = "text", text = "Alt-click any mob in the world, a nameplate, your target frame, or any item, to open it here." },
             { kind = "text", text = "Inside dungeons and raids the game hides which mob you're looking at from addons, so use the Dungeons and Raids pages there." },
         })
@@ -1173,12 +1180,29 @@ local function CreateUI()
     ui.back:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ui.nav = Text(ui, "GameFontNormal")
     ui.nav:SetPoint("LEFT", ui.back, "RIGHT", 6, 0)
-    ui.nav:SetPoint("RIGHT", ui, "TOPRIGHT", -260, -44)
+    ui.nav:SetPoint("RIGHT", ui, "TOPRIGHT", -440, -44)
     ui.nav:SetJustifyH("LEFT")
     ui.nav:SetWordWrap(false)
 
     ui.search = W.Input(ui, 240, "Search mobs, NPCs and items")
     ui.search:SetPoint("TOPRIGHT", -20, -34)
+
+    -- where the data comes from, always visible; hover for the Questie hint
+    ui.source = CreateFrame("Button", nil, ui)
+    ui.source:SetSize(150, 20)
+    ui.source:SetPoint("RIGHT", ui.search, "LEFT", -14, 0)
+    ui.source.text = Text(ui.source, "GameFontNormalSmall")
+    ui.source.text:SetPoint("RIGHT")
+    ui.source:SetScript("OnEnter", function(self)
+        local label, _, lines = SB.DataSource()
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine(label, 1, 1, 1)
+        for _, line in ipairs(lines) do GameTooltip:AddLine(line, 1, 0.82, 0, true) end
+        GameTooltip:AddLine("Click for details in chat (/tits status).", 0.62, 0.62, 0.62)
+        GameTooltip:Show()
+    end)
+    ui.source:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ui.source:SetScript("OnClick", function() SB.Status() end)
     ui.search:SetScript("OnTextChanged", function(self, user)
         if not user then return end
         local text = self:GetText() or ""

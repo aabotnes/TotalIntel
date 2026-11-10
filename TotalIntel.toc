@@ -2,7 +2,7 @@
 ## Title: Total Intel on Targets & Spoils (TITS)
 ## Notes: |cffc27dff[Soeta's]|r An Adventure Guide for every mob and item: loot and drop chances, abilities, quests and recipes, on tooltips and in a journal. /tits
 ## Author: Soeta
-## Version: 2.2.0
+## Version: 2.2.1
 ## IconTexture: Interface\Icons\Ability_Physical_Taunt
 ## SavedVariables: TotalIntelDB
 ## OptionalDeps: QuestieDB, Questie

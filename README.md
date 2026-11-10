@@ -42,6 +42,7 @@ It's an open book, like the Adventure Guide:
 - **Search** (top right): any mob, NPC or item by name or ID, whether you've seen it or not. Results are grouped into *Mobs and NPCs* and *Items*. `/tits <name>` does the same from chat.
 - **Bottom tabs:** Recent, Zone, Bestiary, **Dungeons**, **Raids** and Settings. Dungeons and Raids show every instance as a tile with the Adventure Guide's artwork. Click one for its bosses, its other inhabitants and its boss loot.
 - **Back arrow** (top left) and the path next to it show where you are.
+- **Data:** (next to the search box) shows where NPC and quest data comes from: *live (Questie)*, *live (QuestieDB)* in green, or *built-in snapshot* in amber. Hover it for details. With the snapshot, it suggests installing Questie or QuestieDB for newer data.
 - **Resize** the journal by dragging its bottom-right corner. It remembers the size.
 
 **Mob tabs**
