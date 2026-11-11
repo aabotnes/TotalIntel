@@ -803,9 +803,34 @@ function SB.GetQuest(id)
     local text = table.concat(Q(id, "objectivesText") or {}, " ")
     c = { id = id, name = name, level = Q(id, "questLevel") or 0, reqLevel = Q(id, "requiredLevel") or 0,
           races = Q(id, "requiredRaces") or 0, classMask = Q(id, "requiredClasses") or 0, text = text,
-          starters = sb[1] or {}, enders = fb[1] or {}, startItems = sb[3] or {}, kill = kill, items = items }
+          starters = sb[1] or {}, enders = fb[1] or {}, startItems = sb[3] or {}, kill = kill, items = items,
+          sourceItems = Q(id, "requiredSourceItems") or {} }
     questCache[id] = c
     return c
+end
+
+-- A quest's full description, as the quest giver says it, with $N/$C/$R/$B/$G filled in for you.
+function SB.QuestText(id)
+    local raw = D.qtext and D.qtext[id]
+    if not raw then return nil end
+    local name = UnitName and UnitName("player") or "you"
+    local class = UnitClass and UnitClass("player") or "adventurer"
+    local race = UnitRace and UnitRace("player") or "adventurer"
+    local female = UnitSex and UnitSex("player") == 3
+    raw = raw:gsub("%$[Gg]([^:;]*):([^;]*);", function(male, fem) return female and fem or male end)
+    raw = raw:gsub("%$[Bb]", "\n"):gsub("%$[Nn]", name):gsub("%$[Cc]", class:lower()):gsub("%$[Rr]", race:lower())
+    raw = raw:gsub("\n\n+", "\n\n")
+    return raw
+end
+
+-- How many of each item / mob / object a quest needs: { items = {[id]=n}, kills = {[id]=n}, objects = {[id]=n} }
+function SB.QuestCounts(id)
+    local out = { items = {}, kills = {}, objects = {} }
+    for kind, target, n in ((D.qcount and D.qcount[id]) or ""):gmatch("(%a)(%d+)x(%d+)") do
+        local t = kind == "i" and out.items or kind == "c" and out.kills or out.objects
+        t[tonumber(target)] = tonumber(n)
+    end
+    return out
 end
 
 -- true when masks a and b share a bit (works above 32 bits, unlike bit.band)

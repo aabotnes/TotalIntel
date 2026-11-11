@@ -1,8 +1,18 @@
 # Total Intel on Targets & Spoils
 
-*by Soeta* · `/tits`
+*by Soeta* · `/tits` · for **WoW: Forever** (interface 16001)
 
 An Adventure Guide for every mob and item in WoW: Forever. Hover a mob to see its best drops, its abilities and the quests you need it for. Alt-click any mob or item to open its page in a journal styled like the game's own Adventure Guide. There you'll find loot with drop chances, abilities, quests, where it spawns, how an item is crafted, and everything you've killed, looted and seen yourself.
+
+**At a glance**
+
+- **Mob pages:** loot with drop chances next to your own rates, abilities, quests, spawn points with map pins, a 3D model, and your notes.
+- **Item pages:** every mob that drops it, how it's crafted (profession, skill, reagents), quests that use it, and every vendor that sells it.
+- **Quests:** open any quest to read its text and see the items and kills it needs, with your progress and what's in your bags.
+- **Vendors and trainers:** what they sell, with prices in coins, and what they teach, checked against your level, skill and money.
+- **Dungeons and raids:** a grid with the Adventure Guide's artwork, each instance's bosses and their loot.
+- **Tooltips:** the same information on mob and item tooltips, every line switchable.
+- **Your bestiary:** kills, loot, skinning and pickpocketing, and the spells mobs cast at you, saved for your whole account.
 
 ## Where the data comes from
 
@@ -21,8 +31,9 @@ Total Intel reads live sources first, so it follows the current version of Forev
 
 ## Install
 
-1. Unzip Total Intel into `Interface\AddOns`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`.
-2. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
+1. On this page, click **Code → Download ZIP**.
+2. Unzip it into `Interface\AddOns` and rename the folder `TotalIntel-main` to `TotalIntel`. You should end up with `Interface\AddOns\TotalIntel\TotalIntel.toc`. The folder must be named exactly `TotalIntel`, or the game won't load it.
+3. Restart the game and make sure **Total Intel on Targets & Spoils** is ticked in the AddOns list.
 
 Nothing else is required. If you also run Questie (or the QuestieDB addon), Total Intel reads its database instead of the bundled snapshot, so new quests and NPCs show up as soon as Questie updates.
 
@@ -52,7 +63,7 @@ It's an open book, like the Adventure Guide:
 - **Sells** (vendors): every item, with price and limited stock once you've opened that vendor. Before that it shows Questie's list.
 - **Teaches** (trainers): one row per spell or recipe, with its cost in coins (red if you can't afford it) and what it requires, in green if you meet it and red if you don't. Your own skill is shown as a bar on top, e.g. *Your Fishing 37 / 75*, or *Not learned*. It's read from the trainer window when you visit; before that it shows the Classic trainer list.
 - **Model:** the mob in 3D. Drag to turn it.
-- **Quests:** on your quests (with progress), needed for, starts, and turn in here.
+- **Quests:** on your quests (with progress), needed for, starts, and turn in here. Click a quest to open it, as described under [Quests](#quests).
 - **Notes:** your own notes, saved for all your characters.
 
 **Item tabs:** Overview, **Dropped by** (every mob, no "+23 more"), **Crafted**, **Quests** and **Sold by** (every vendor).
@@ -60,6 +71,19 @@ It's an open book, like the Adventure Guide:
 **Instance tabs:** Overview (Adventure Guide lore, level range, bosses) and Loot (each boss's drops).
 
 **Wowhead link** shows the page's Wowhead link, ready to copy with Ctrl+C, because the game can't open a browser.
+
+## Quests
+
+Quests are listed wherever they matter: a mob's and an item's **Quests** tab, and an instance's pages. Click a quest to open it underneath:
+
+- **The quest text**, as the quest giver says it, with your name, class and race filled in, and the short objective line.
+- **Required items:** each one clickable to open its page. It shows your progress from the quest log (e.g. *2 / 8*, green when done) or, for quests you haven't picked up, how many it needs (e.g. *x8*), plus how many are in your bags and how many kinds of mob drop it.
+- **Kill:** the mobs it needs, with your progress or the count.
+- **Also:** any other objective in your quest log (objects to use, places to explore).
+- **Quest givers:** who gives it and where you turn it in, each clickable, with their zone.
+- **Wowhead link**.
+
+Click the quest again to close it. Quest text and counts are Classic reference data (CMaNGOS); your progress comes from your quest log.
 
 ## Crafting
 
@@ -109,6 +133,16 @@ Open them with `/tits options`, the Settings tab, or **Options → AddOns**. The
 - **Dungeons and raids:** inside instances, Forever hides from addons which mob a tooltip or your target is. Mob tooltips there get no extra lines, and the target can't be identified. Use the instance's page instead: `/tits` opens it.
 - **Kills** are counted when a mob you fought dies on your target or nameplates, and when you loot its corpse. Forever reserves the combat log for Blizzard's own UI, so addons can't use it.
 - **What's recorded:** kills, every corpse you loot and what was on it, skinning, mining and herbing loot, pickpocketing (while stealthed), spells mobs cast near you, mobs' names and levels, and recipes. It's all saved for your whole account. Turn recording off with `/tits learn`.
+
+## Development
+
+The addon runs headless against a mocked WoW: Forever client, with no game needed:
+
+```bash
+lua5.1 tests/test_totalintel.lua .
+```
+
+The bundled data in `Data/` is generated by `tools/build_data.py`. See [tools/README.md](tools/README.md) for how to rebuild it, and [tests/README.md](tests/README.md) for what the tests cover. The `tests/` and `tools/` folders are left out of GitHub's Download ZIP.
 
 ## Data and license
 

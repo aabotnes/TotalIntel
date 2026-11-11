@@ -90,6 +90,11 @@ local function FindObjective(entry, name, kind)
     if #candidates == 1 then return candidates[1] end
 end
 
+-- The quest log objective of an active quest that matches a name (an item or mob), if any.
+function Q.Objective(entry, name, kind)
+    return entry and FindObjective(entry, name, kind)
+end
+
 function Q.ObjectiveText(o)
     if not o then return nil end
     if o.have and o.need then return ("%d/%d"):format(o.have, o.need) end

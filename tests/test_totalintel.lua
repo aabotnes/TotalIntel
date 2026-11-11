@@ -164,6 +164,25 @@ for i, row in ipairs(SB.ContentRows()) do if row.kind == "spell" and row.id == 6
 check(after and after.kind == "text", "clicking an ability opens its description")
 SB.SetTab("quests")
 check(Content("Wanted"), "quests tab: your active quest")
+local questRow = Content("Wanted")
+check(questRow.expandable and not questRow.expanded, "quests are closed until you click them")
+GetItemCount = function(id) return id == CLAW and 1 or 0 end
+UnitRace = function() return "Human", "Human" end
+questRow.onClick(questRow)
+check(Content("Wanted").expanded, "clicking a quest opens it")
+check(Content("Hogger, is prowling the woods"), "it shows the quest giver's text")
+local clawLine
+for _, r in ipairs(SB.ContentRows()) do if r.kind == "item" and r.id == CLAW then clawLine = r end end
+check(clawLine and clawLine.kind == "item" and clawLine.inset and clawLine.mid:find("0 / 1") and clawLine.right == "in bags: 1",
+    "required item: clickable, with your quest progress and how many are in your bags")
+check(Content("Marshal Dughan") and Content("Turn it in here"), "who you turn it in to")
+check(Content("Wowhead link"), "the Wowhead link is inside the opened quest")
+clawLine.onClick(clawLine)
+check(SB.CurrentPage().kind == "item" and SB.CurrentPage().id == CLAW, "clicking the required item opens its page")
+SB.Back()
+SB.SetTab("quests")
+Content("Wanted").onClick(Content("Wanted"))
+check(not Content("Hogger, is prowling the woods"), "clicking again closes it")
 
 SB.SetTab("overview")
 local zoneRow
@@ -286,6 +305,12 @@ check(forQuests[112] == 1256 and forQuests[150] == 1468, "it drops items for Col
 SB.OpenNpc(MURLOC)
 SB.SetTab("quests")
 check(Content("Needed for") and Content("Collecting Kelp") and Content("Murloc Poachers"), "its Quests tab lists them")
+local poachers = Content("Murloc Poachers")
+poachers.onClick(poachers)
+check(Content("Murlocs are becoming a problem") and Content("Hunt murlocs!"), "an opened quest shows its full text")
+local fin
+for _, r in ipairs(SB.ContentRows()) do if r.kind == "item" and r.id == 1468 then fin = r end end
+check(fin and fin.mid == "x8" and fin.sub:find("^Dropped by"), "a quest not in your log shows the count it needs: 8 Murloc Fins")
 SB.SetTab("loot")
 check(Content("Crystal Kelp Frond") and Content("%(Wowhead%)"), "its loot has the quest items with Wowhead rates")
 check(SB.Search("murloc streamr")[1].id == MURLOC, "search finds a mob you've never seen")

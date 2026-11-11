@@ -522,9 +522,11 @@ B.kv = {
 B.line = {
     new = function(parent)
         local b = BarRow(parent, 26)
+        b.expand = W.Text(b, "GameFontNormalLarge")
+        b.expand:SetPoint("LEFT", 8, 0)
+        b.expand:SetWidth(12)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetSize(16, 16)
-        b.icon:SetPoint("LEFT", 8, 0)
         b.text = W.Text(b, "GameFontHighlight")
         b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
         b.text:SetJustifyH("LEFT")
@@ -540,7 +542,19 @@ B.line = {
     end,
     set = function(b, r, width)
         b:SetWidth(width)
+        b.icon:ClearAllPoints()
+        if r.expandable then
+            b.expand:SetText(r.expanded and "-" or "+")
+            Skin.Color(b.expand, "header")
+            b.expand:Show()
+            b.icon:SetPoint("LEFT", 24, 0)
+        else
+            b.expand:Hide()
+            b.icon:SetPoint("LEFT", 8, 0)
+        end
         if r.icon then b.icon:SetTexture(r.icon); b.icon:SetTexCoord(0, 1, 0, 1); b.icon:Show() else b.icon:Hide() end
+        b.sel:SetShown(r.expanded and true or false)
+        b.accent:SetShown(r.expanded and true or false)
         b.text:SetText(r.text or "")
         TextColor(b.text, r.color, "light")
         b.mid:SetText(r.mid or "")
@@ -745,10 +759,11 @@ function W.Flow(parent)
             local f, b = self:Acquire(r.kind, used)
             f.row = r
             f:Show()
-            if b.before and i > 1 then y = y + b.before end
-            local h, x = b.set(f, r, width)
+            if b.before and i > 1 and not r.inset then y = y + b.before end
+            local inset = r.inset or 0
+            local h, x = b.set(f, r, width - inset)
             f:ClearAllPoints()
-            f:SetPoint("TOPLEFT", self.child, "TOPLEFT", x or 0, -y)
+            f:SetPoint("TOPLEFT", self.child, "TOPLEFT", (x or 0) + inset, -y)
             y = y + (h or 20) + (b.gap or 2)
         end
         for b, pool in pairs(self.pools) do

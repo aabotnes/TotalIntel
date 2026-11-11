@@ -11,6 +11,7 @@
 | `Loot.lua` | per NPC: item:chance, best first (`:q` = only while on the quest) |
 | `LootExtra.lua` | skinning and pickpocket loot |
 | `Spells.lua` | spells each NPC casts (spell lists, EventAI and boss scripts) |
+| `QuestDetails.lua` | each quest's full text, and how many of each item, mob and object it needs |
 | `Trainers.lua`, `TrainerTemplates.lua` | what each trainer teaches: spell, cost, level and skill (the fallback until you visit the trainer in the game) |
 | `ForeverNpcs.lua`, `ForeverItems.lua`, `ForeverQuests.lua` | the Forever snapshot: names, levels, spawn zones with a central point, quest links, drops, vendors |
 | `ForeverRates.lua` | Wowhead drop rates for quest items |

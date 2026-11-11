@@ -111,18 +111,7 @@ local function QuestTooltip(tt, row)
             tt:AddLine(o.text, o.done and 0.4 or 1, 1, o.done and 0.4 or 1)
         end
     end
-    tt:AddLine("|cff888888Click: Wowhead link (quest " .. row.id .. ")|r")
-end
-
-local function QuestRow(id, right, what)
-    local q = SB.GetQuest(id)
-    local active = SB.QuestLog.IsActive(id)
-    local name = (q and q.name) or (active and active.title) or ("Quest " .. id)
-    local st, color = QuestState(id)
-    return { kind = "quest", id = id, icon = active and ACTIVE_ICON or QUEST_ICON,
-             text = name .. (q and (" [" .. q.level .. "]") or ""), color = color,
-             mid = what or st, right = right, tooltip = QuestTooltip,
-             onClick = function() SB.ShowLink("quest", id, name) end }
+    tt:AddLine("|cff888888Click to show or hide the quest text and what it needs|r")
 end
 
 local function Header(text, right) return { kind = "header", text = text, right = right } end
@@ -130,6 +119,120 @@ local function Note(text, color) return { kind = "text", text = text, color = co
 local function KV(key, value, color) return { kind = "kv", key = key, text = value, color = color } end
 
 local function FormatTime(t) return t and date("%d %b %Y, %H:%M", t) or "-" end
+
+-- A quest row. Clicking it opens the quest underneath (see QuestDetails).
+local function QuestRow(id, right, what)
+    local q = SB.GetQuest(id)
+    local active = SB.QuestLog.IsActive(id)
+    local name = (q and q.name) or (active and active.title) or ("Quest " .. id)
+    local st, color = QuestState(id)
+    local key = "q" .. id
+    return { kind = "quest", id = id, icon = active and ACTIVE_ICON or QUEST_ICON,
+             text = name .. (q and (" [" .. q.level .. "]") or ""), color = color,
+             mid = what or st, right = right, tooltip = QuestTooltip,
+             expandable = true, expanded = state.expanded[key],
+             onClick = function() state.expanded[key] = not state.expanded[key]; SB.Redraw(true) end }
+end
+
+local INSET = 18
+local GREEN, YELLOW = "|cff40e040", "|cffffd100"
+
+-- What's inside an opened quest: its text, the items and kills it needs (with your progress),
+-- who gives it and where it's turned in, and its Wowhead link.
+local function QuestDetails(rows, id)
+    local q = SB.GetQuest(id)
+    local active = SB.QuestLog.IsActive(id)
+    local counts = SB.QuestCounts(id)
+    local function Add(r) r.inset = INSET; rows[#rows + 1] = r; return r end
+
+    local text = SB.QuestText(id)
+    if text then Add({ kind = "text", text = text }) end
+    if q and q.text and q.text ~= "" then Add({ kind = "text", text = "Objective: " .. q.text }) end
+    if not text and not (q and q.text ~= "") and not active then
+        Add(Note("No quest text known for this quest."))
+    end
+
+    local function Progress(o, need)
+        if o and o.have and o.need then
+            return (o.done and GREEN or YELLOW) .. o.have .. " / " .. o.need .. "|r"
+        end
+        if o and o.done then return GREEN .. "done|r" end
+        return need and ("x" .. need) or nil
+    end
+    local matched = {}
+
+    -- required items
+    local items, seenItem = {}, {}
+    local function AddItem(item, handIn)
+        if item and not seenItem[item] then seenItem[item] = true; items[#items + 1] = { item = item, handIn = handIn } end
+    end
+    for _, item in ipairs(q and q.items or {}) do AddItem(item, true) end
+    for item in pairs(counts.items) do AddItem(item, true) end
+    for _, item in ipairs(q and q.sourceItems or {}) do AddItem(item, false) end
+    if #items > 0 then
+        Add(Header("Required items", tostring(#items)))
+        for _, e in ipairs(items) do
+            local it = SB.GetItem(e.item)
+            local o = active and SB.QuestLog.Objective(active, it.name, "item")
+            if o then matched[o] = true end
+            local bags = GetItemCount and GetItemCount(e.item) or 0
+            local droppers = SB.DropperCount(e.item)
+            local sub = not e.handIn and "Needed, not handed in"
+                or (droppers > 0 and ("Dropped by " .. SB.Plural(droppers, "mob")) or "Quest item")
+            Add(ItemRow(e.item, Progress(o, counts.items[e.item]), bags > 0 and ("in bags: " .. bags) or nil, sub))
+        end
+    end
+
+    -- mobs to kill
+    local kills, seenKill = {}, {}
+    for npc in pairs(counts.kills) do if not seenKill[npc] then seenKill[npc] = true; kills[#kills + 1] = npc end end
+    for _, npc in ipairs(q and q.kill or {}) do
+        if not seenKill[npc] and #kills < 6 then seenKill[npc] = true; kills[#kills + 1] = npc end
+    end
+    if #kills > 0 then
+        Add(Header("Kill", tostring(#kills)))
+        for _, npc in ipairs(kills) do
+            local o = active and SB.QuestLog.Objective(active, SB.NpcName(npc), "monster")
+            if o then matched[o] = true end
+            Add(NpcRow(npc, "npc", { mid = Progress(o, counts.kills[npc]) }))
+        end
+    end
+
+    -- anything else in your quest log (objects to use, events, places to explore)
+    if active then
+        local other = {}
+        for _, o in ipairs(active.objectives) do if not matched[o] then other[#other + 1] = o end end
+        if #other > 0 then
+            Add(Header(#items + #kills > 0 and "Also" or "Objectives"))
+            for _, o in ipairs(other) do
+                Add({ kind = "line", text = o.text, color = o.done and "good" or "light", right = Progress(o) })
+            end
+        end
+    end
+
+    -- who gives it, and where it goes
+    local who = {}
+    for _, npc in ipairs(q and q.starters or {}) do who[#who + 1] = { npc = npc, sub = "Gives the quest" } end
+    for _, npc in ipairs(q and q.enders or {}) do who[#who + 1] = { npc = npc, sub = "Turn it in here" } end
+    if #who > 0 or (q and #q.startItems > 0) then
+        Add(Header("Quest givers"))
+        for _, w in ipairs(who) do
+            local n = SB.GetNpc(w.npc)
+            Add(NpcRow(w.npc, "npc", { sub = w.sub .. (n and n.zones[1] and (" · " .. SB.ZoneName(n.zones[1].area)) or "") }))
+        end
+        for _, item in ipairs(q and q.startItems or {}) do Add(ItemRow(item, nil, nil, "Starts the quest")) end
+    end
+
+    local name = (q and q.name) or (active and active.title) or ("Quest " .. id)
+    Add({ kind = "line", text = "Wowhead link", icon = "Interface\\Icons\\INV_Misc_Note_01",
+          onClick = function() SB.ShowLink("quest", id, name) end })
+end
+
+-- A quest row, followed by its details when it's open.
+local function QuestRows(rows, id, right, what)
+    rows[#rows + 1] = QuestRow(id, right, what)
+    if state.expanded["q" .. id] then QuestDetails(rows, id) end
+end
 
 ------------------------------------------------------------------------------
 -- Waypoints
@@ -597,7 +700,7 @@ local function NpcQuests(id, n)
         for _, r in ipairs(active) do
             local what = r.kind == "loot" and (SB.GetItem(r.item).name .. " " .. SB.Percent(r.chance))
                 or (r.kind == "kill" and "kill") or "shown by the game"
-            rows[#rows + 1] = QuestRow(r.entry.id, SB.QuestLog.ObjectiveText(r.objective), what)
+            QuestRows(rows, r.entry.id, SB.QuestLog.ObjectiveText(r.objective), what)
         end
     end
     local needed, seen = {}, {}
@@ -615,15 +718,15 @@ local function NpcQuests(id, n)
     end
     if #needed > 0 then
         rows[#rows + 1] = Header("Needed for")
-        for _, e in ipairs(needed) do rows[#rows + 1] = QuestRow(e.q, nil, e.what) end
+        for _, e in ipairs(needed) do QuestRows(rows, e.q, nil, e.what) end
     end
     if n and #n.starts > 0 then
         rows[#rows + 1] = Header("Starts")
-        for _, q in ipairs(n.starts) do rows[#rows + 1] = QuestRow(q) end
+        for _, q in ipairs(n.starts) do QuestRows(rows, q) end
     end
     if n and #n.ends > 0 then
         rows[#rows + 1] = Header("Turn in here")
-        for _, q in ipairs(n.ends) do rows[#rows + 1] = QuestRow(q) end
+        for _, q in ipairs(n.ends) do QuestRows(rows, q) end
     end
     if #rows == 0 then rows[1] = Note("No quests involve this mob.") end
     return rows
@@ -731,19 +834,19 @@ local function ItemQuests(id)
     local active = SB.QuestLog.ForItem(id)
     if #active > 0 then
         rows[#rows + 1] = Header("On your quests")
-        for _, r in ipairs(active) do rows[#rows + 1] = QuestRow(r.entry.id, SB.QuestLog.ObjectiveText(r.objective)) end
+        for _, r in ipairs(active) do QuestRows(rows, r.entry.id, SB.QuestLog.ObjectiveText(r.objective)) end
     end
     if uses.starts then
         rows[#rows + 1] = Header("Starts")
-        rows[#rows + 1] = QuestRow(uses.starts)
+        QuestRows(rows, uses.starts)
     end
     if #uses.objectiveOf > 0 then
         rows[#rows + 1] = Header("Needed for", tostring(#uses.objectiveOf))
-        for _, q in ipairs(uses.objectiveOf) do rows[#rows + 1] = QuestRow(q) end
+        for _, q in ipairs(uses.objectiveOf) do QuestRows(rows, q) end
     end
     if #uses.rewardOf > 0 then
         rows[#rows + 1] = Header("Reward from", tostring(#uses.rewardOf))
-        for _, q in ipairs(uses.rewardOf) do rows[#rows + 1] = QuestRow(q) end
+        for _, q in ipairs(uses.rewardOf) do QuestRows(rows, q) end
     end
     if #rows == 0 then rows[1] = Note("No quests use this item.") end
     return rows
