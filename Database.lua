@@ -274,6 +274,84 @@ function SB.PlayerAreas()
     return areas, info and info.name or (GetZoneText and GetZoneText()) or "?"
 end
 
+-- Every area on the same map as `area` (a zone and its subzones).
+function SB.AreasForZone(area)
+    ZoneTables()
+    local out = { [area] = true }
+    local ui = uiMapOf[area]
+    if ui and areasOfUiMap[ui] then for a in pairs(areasOfUiMap[ui]) do out[a] = true end end
+    return out
+end
+
+local function MapInfo(ui)
+    if not (ui and C_Map and C_Map.GetMapInfo) then return nil end
+    local ok, info = pcall(C_Map.GetMapInfo, ui)
+    return ok and type(info) == "table" and info or nil
+end
+
+-- Every outdoor zone with mobs: { {area, name, continent, mobs, minLevel, maxLevel}, ... },
+-- sorted by continent then name. Zones on the same map are merged. Built once per index.
+local zoneDirectory
+function SB.ZoneDirectory()
+    if zoneDirectory and zoneDirectory.ready == SB.index.ready then return zoneDirectory end
+    ZoneTables()
+    local instances = {}
+    for _, a in pairs(InstanceAreaTable()) do instances[a] = true end
+    local byKey, list = {}, {}
+    for area, npcs in pairs(SB.index.npcsInArea or {}) do
+        local top = dungeonParent[area] or area
+        if not instances[top] and not dungeonName[top] then
+            local ui = uiMapOf[area]
+            local key = ui and ("m" .. ui) or ("a" .. area)
+            local z = byKey[key]
+            if not z then
+                z = { area = area, uiMap = ui, seen = {}, mobs = 0 }
+                byKey[key] = z
+                list[#list + 1] = z
+            end
+            for _, id in ipairs(npcs) do
+                if not z.seen[id] then z.seen[id] = true; z.mobs = z.mobs + 1 end
+            end
+        end
+    end
+    for _, z in ipairs(list) do
+        local info = MapInfo(z.uiMap)
+        z.name = info and info.name or SB.ZoneName(z.area)
+        local parent = info and MapInfo(info.parentMapID)
+        z.continent = parent and parent.name or "Zones"
+        local lo, hi = 999, 0
+        for id in pairs(z.seen) do
+            local minL, maxL, rank = N(id, "minLevel") or 0, N(id, "maxLevel") or 0, N(id, "rank") or 0
+            local friendly = N(id, "friendlyToFaction")
+            if minL > 0 and maxL < 64 and rank ~= 3 and (friendly == nil or friendly == "") then
+                lo, hi = math.min(lo, minL), math.max(hi, maxL)
+            end
+        end
+        if hi > 0 then z.minLevel, z.maxLevel = lo, hi end
+        z.seen = nil
+    end
+    table.sort(list, function(a, b)
+        if a.continent ~= b.continent then return a.continent < b.continent end
+        return a.name < b.name
+    end)
+    list.ready = SB.index.ready
+    zoneDirectory = list
+    return list
+end
+
+-- A zone from the directory by (part of) its name.
+function SB.FindZone(text)
+    text = (text or ""):lower()
+    if text == "" then return nil end
+    local best
+    for _, z in ipairs(SB.ZoneDirectory()) do
+        local name = z.name:lower()
+        if name == text then return z end
+        if not best and name:find(text, 1, true) then best = z end
+    end
+    return best
+end
+
 function SB.CurrentInstance()
     if not (IsInInstance and IsInInstance()) or not GetInstanceInfo then return nil end
     local mapID = select(8, GetInstanceInfo())
@@ -303,6 +381,7 @@ local function Build(yield)
     local n = {
         foreverItems = {},     -- npc  -> { item, ... } from QuestieDB's npcDrops
         sells = {},            -- npc  -> { item, ... } from QuestieDB's vendors
+        rewards = {},          -- quest -> { item, ... } from QuestieDB's questRewards
         npcsInArea = {},       -- area -> { npc, ... }
         killFor = {},          -- npc  -> { quest, ... }
         itemFor = {},          -- item -> { quest, ... } (quest objectives and required items)
@@ -311,6 +390,7 @@ local function Build(yield)
         for _, item in ipairs(AllIds(ItemDB)) do
             for _, npc in ipairs(I(item, "npcDrops") or {}) do Add(n.foreverItems, npc, item) end
             for _, npc in ipairs(I(item, "vendors") or {}) do Add(n.sells, npc, item) end
+            for _, q in ipairs(I(item, "questRewards") or {}) do Add(n.rewards, q, item) end
             Tick()
         end
         for _, npc in ipairs(AllIds(NpcDB)) do
@@ -833,6 +913,67 @@ function SB.QuestCounts(id)
     return out
 end
 
+-- Experience for a quest at your level. Quests far below you give less: from 6 levels above the
+-- quest it drops to 80, 60, 40, 20 and then 10 percent, rounded like the game does.
+local function ReduceXP(xp, questLevel, playerLevel)
+    local diff = playerLevel - questLevel
+    local f = diff <= 5 and 1 or diff == 6 and 0.8 or diff == 7 and 0.6 or diff == 8 and 0.4 or diff == 9 and 0.2 or 0.1
+    if f == 1 then return xp end
+    xp = xp * f
+    local step = xp > 1000 and 50 or xp > 500 and 25 or xp > 100 and 10 or 5
+    return math.floor(xp / step + 0.5) * step
+end
+SB.ReduceXP = ReduceXP
+
+-- What a quest gives: { choices = {{item, count}}, items = {{item, count}}, money, moneyMax,
+-- xp (full), xpYou (at your level, nil at max level), rep = {{faction, value}} }
+function SB.QuestRewards(id)
+    local r = { choices = {}, items = {}, rep = {} }
+    local seen = {}
+    for kind, a, b in ((D.qreward and D.qreward[id]) or ""):gmatch("(%a)(%d+)x?:?(%-?%d*)") do
+        a, b = tonumber(a), tonumber(b)
+        if kind == "c" then r.choices[#r.choices + 1] = { a, b or 1 }; seen[a] = true
+        elseif kind == "r" then r.items[#r.items + 1] = { a, b or 1 }; seen[a] = true
+        elseif kind == "m" then r.money = a
+        elseif kind == "M" then r.moneyMax = a
+        elseif kind == "f" then r.rep[#r.rep + 1] = { a, b } end
+    end
+    -- reward items Forever's data lists that the Classic table doesn't
+    for _, item in ipairs(idx.rewards and idx.rewards[id] or {}) do
+        if not seen[item] then seen[item] = true; r.items[#r.items + 1] = { item, 1 } end
+    end
+    -- reputation: Forever's own values win over the Classic ones
+    local live = Q(id, "reputationReward")
+    if type(live) == "table" and #live > 0 then
+        r.rep = {}
+        for _, p in ipairs(live) do if p[1] and p[2] then r.rep[#r.rep + 1] = { p[1], p[2] } end end
+    end
+    -- experience from QuestieDB's quest XP table
+    SB.QDB()
+    local xpdb = LQ and LQ.Support and LQ.Support.Get and select(2, pcall(LQ.Support.Get, "QuestXP"))
+    local e = type(xpdb) == "table" and type(xpdb.db) == "table" and xpdb.db[id]
+    if type(e) == "table" and (e[2] or 0) > 0 then
+        r.xp = e[2]
+        local level = UnitLevel("player") or 1
+        local max = (GetMaxPlayerLevel and GetMaxPlayerLevel()) or 60
+        if level < max then r.xpYou = ReduceXP(e[2], e[1] or 0, level) end
+    end
+    return r
+end
+
+-- A faction's name, from the game.
+function SB.FactionName(id)
+    if C_Reputation and C_Reputation.GetFactionDataByID then
+        local ok, d = pcall(C_Reputation.GetFactionDataByID, id)
+        if ok and type(d) == "table" and d.name then return d.name end
+    end
+    if GetFactionInfoByID then
+        local ok, name = pcall(GetFactionInfoByID, id)
+        if ok and name then return name end
+    end
+    return "Faction " .. id
+end
+
 -- true when masks a and b share a bit (works above 32 bits, unlike bit.band)
 local function Overlap(a, b)
     while a > 0 and b > 0 do
@@ -1011,7 +1152,7 @@ end
 
 function SB.ResetCaches()
     wipe(npcCache); wipe(lootCache); wipe(itemCache); wipe(questCache); wipe(instanceCache); wipe(cmCache)
-    npcNames, itemNames, uiMapOf = nil, nil, nil
+    npcNames, itemNames, uiMapOf, zoneDirectory = nil, nil, nil, nil
 end
 
 SB.OnIndexReady = function()

@@ -175,7 +175,9 @@ local UNCOMMON = { [818] = true, [1210] = true, [774] = true }
 C_Item = { GetItemInfo = function() return nil end, GetItemIconByID = function(id) return 130000 + (id % 1000) end,
            GetItemQualityByID = function(id) return UNCOMMON[id] and 2 or 1 end }
 function GetMoney() return M.money or 0 end
-C_Map = { GetBestMapForUnit = function() return 1429 end, GetMapInfo = function() return { name = "Elwynn Forest" } end,
+local MAPS = { [1429] = { name = "Elwynn Forest", parentMapID = 1415 }, [1436] = { name = "Westfall", parentMapID = 1415 },
+               [1415] = { name = "Eastern Kingdoms" }, [1414] = { name = "Kalimdor" } }
+C_Map = { GetBestMapForUnit = function() return 1429 end, GetMapInfo = function(ui) return MAPS[ui] end,
           GetAreaInfo = function(a) return ({ [12] = "Elwynn Forest", [1519] = "Stormwind City" })[a] end }
 
 function M.Load(dir, files)

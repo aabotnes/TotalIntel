@@ -311,6 +311,52 @@ check(Content("Murlocs are becoming a problem") and Content("Hunt murlocs!"), "a
 local fin
 for _, r in ipairs(SB.ContentRows()) do if r.kind == "item" and r.id == 1468 then fin = r end end
 check(fin and fin.mid == "x8" and fin.sub:find("^Dropped by"), "a quest not in your log shows the count it needs: 8 Murloc Fins")
+
+-- rewards
+C_Reputation = { GetFactionDataByID = function(id) if id == 72 then return { name = "Stormwind" } end end }
+local rw = SB.QuestRewards(176)
+check(#rw.choices == 3 and rw.xp == 880 and rw.rep[1][1] == 72 and rw.rep[1][2] == 250 and rw.moneyMax == 525,
+    "Wanted: Hogger rewards: choose one of 3 items, 880 XP, +250 Stormwind")
+M.level = 12
+check(SB.QuestRewards(176).xpYou == 880, "full XP near the quest's level")
+M.level = 20
+check(SB.QuestRewards(176).xpYou == 180, "XP shrinks when you outlevel a quest (9 levels: 20%, rounded)")
+M.level = 60
+check(SB.QuestRewards(176).xpYou == nil, "no XP at max level")
+M.level = 12
+SB.OpenNpc(448)
+SB.SetTab("quests")
+local wanted = Content("Wanted")
+if not wanted.expanded then wanted.onClick(wanted) end
+check(Content("Rewards") and Content("880 XP") and Content("Choose one") and Content("Stormwind") and Content("%+250"),
+    "an opened quest lists its rewards: items, experience and reputation")
+
+-- tabs with nothing to show are hidden
+check(SB.TabKeys() == "overview,loot,abilities,model,quests,notes", "Hogger's tabs: no Sells or Teaches (" .. SB.TabKeys() .. ")")
+SB.OpenNpc(999999)
+check(SB.TabKeys() == "overview,notes", "an unknown NPC only has Overview and Notes (" .. SB.TabKeys() .. ")")
+SB.OpenItem(1931)
+check(not SB.TabKeys():find("vendors") and not SB.TabKeys():find("crafted") and SB.TabKeys():find("droppedby"),
+    "an item's tabs: no Sold by or Crafted when nothing sells or crafts it (" .. SB.TabKeys() .. ")")
+
+-- zones: browse and pick one
+SB.OpenZone()
+local zr = SB.SidebarRows()
+check(zr[1].text == "Browse all zones", "the Zone list starts with Browse all zones")
+zr[1].onClick(zr[1], "LeftButton")
+zr = SB.SidebarRows()
+local westfall
+for _, r in ipairs(zr) do if r.text == "Westfall" then westfall = r end end
+check(zr[1].text:find("^Your zone") and RowsHave(zr, "Eastern Kingdoms") and westfall and westfall.mid:find("^Levels"),
+    "the zone directory: your zone first, zones by continent with their level range")
+westfall.onClick(westfall)
+check(RowsHave(SB.SidebarRows(), "Harvest Golem") and not RowsHave(SB.SidebarRows(), "Murloc Streamrunner"), "picking Westfall lists Westfall's mobs")
+local browse = SB.SidebarRows()[1]
+browse.onClick(browse, "RightButton")
+check(RowsHave(SB.SidebarRows(), "Murloc Streamrunner"), "right-click goes back to the zone you're in")
+SlashCmdList.TOTALINTEL("zone westfall")
+check(RowsHave(SB.SidebarRows(), "Harvest Golem"), "/tits zone westfall opens Westfall")
+SB.OpenNpc(MURLOC)
 SB.SetTab("loot")
 check(Content("Crystal Kelp Frond") and Content("%(Wowhead%)"), "its loot has the quest items with Wowhead rates")
 check(SB.Search("murloc streamr")[1].id == MURLOC, "search finds a mob you've never seen")

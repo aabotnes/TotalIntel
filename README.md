@@ -8,7 +8,7 @@ An Adventure Guide for every mob and item in WoW: Forever. Hover a mob to see it
 
 - **Mob pages:** loot with drop chances next to your own rates, abilities, quests, spawn points with map pins, a 3D model, and your notes.
 - **Item pages:** every mob that drops it, how it's crafted (profession, skill, reagents), quests that use it, and every vendor that sells it.
-- **Quests:** open any quest to read its text and see the items and kills it needs, with your progress and what's in your bags.
+- **Quests:** open any quest to read its text, see the items and kills it needs (with your progress and what's in your bags), and its rewards: items, experience, money and reputation.
 - **Vendors and trainers:** what they sell, with prices in coins, and what they teach, checked against your level, skill and money.
 - **Dungeons and raids:** a grid with the Adventure Guide's artwork, each instance's bosses and their loot.
 - **Tooltips:** the same information on mob and item tooltips, every line switchable.
@@ -48,8 +48,8 @@ Nothing else is required. If you also run Questie (or the QuestieDB addon), Tota
 It's an open book, like the Adventure Guide:
 
 - **Left page:** a list. **Recent** (your recent targets), **Zone**, **Bestiary** (everything you've killed), search results, or an instance's bosses and inhabitants. Each mob has its portrait.
-- **Zone** lists every mob in the zone you're in, grouped: *For your quests* first, then *Bosses, elites & rares*, *Creatures* and *Friendly NPCs*. Mobs you've seen there are always included, even ones no database knows.
-- **Right page:** the mob, item or instance you picked, with the journal's tabs down the right edge.
+- **Zone** lists every mob in the zone you're in, grouped: *For your quests* first, then *Bosses, elites & rares*, *Creatures* and *Friendly NPCs*. Mobs you've seen there are always included, even ones no database knows. Click **Browse all zones** at the top to pick any other zone: they're grouped by continent with their level range and number of mobs. Right-click it to go back to your own zone, or type `/tits zone westfall`.
+- **Right page:** the mob, item or instance you picked, with the journal's tabs down the right edge. A tab only shows up when it has something in it: a mob that drops nothing has no Loot tab, an item no vendor sells has no Sold by tab.
 - **Search** (top right): any mob, NPC or item by name or ID, whether you've seen it or not. Results are grouped into *Mobs and NPCs* and *Items*. `/tits <name>` does the same from chat.
 - **Bottom tabs:** Recent, Zone, Bestiary, **Dungeons**, **Raids** and Settings. Dungeons and Raids show every instance as a tile with the Adventure Guide's artwork. Click one for its bosses, its other inhabitants and its boss loot.
 - **Back arrow** (top left) and the path next to it show where you are.
@@ -81,9 +81,10 @@ Quests are listed wherever they matter: a mob's and an item's **Quests** tab, an
 - **Kill:** the mobs it needs, with your progress or the count.
 - **Also:** any other objective in your quest log (objects to use, places to explore).
 - **Quest givers:** who gives it and where you turn it in, each clickable, with their zone.
+- **Rewards:** the items to choose from and the ones you always get (each clickable), experience (and how much less you get once you outlevel the quest, or none at max level), money, and reputation with each faction.
 - **Wowhead link**.
 
-Click the quest again to close it. Quest text and counts are Classic reference data (CMaNGOS); your progress comes from your quest log.
+Click the quest again to close it. Quest text, counts, reward items and money are Classic reference data (CMaNGOS). Experience and reputation come from Questie's Forever data, and your progress from your quest log.
 
 ## Crafting
 
@@ -119,6 +120,7 @@ Open them with `/tits options`, the Settings tab, or **Options → AddOns**. The
 | `/tits` | open the journal on your target (or your instance) |
 | `/tits <name>` | search mobs and items, e.g. `/tits hogger`. A single match opens straight away. |
 | `/tits zone` | mobs in your zone or instance |
+| `/tits zone <name>` | mobs in another zone, e.g. `/tits zone westfall` |
 | `/tits dungeons`, `/tits raids` | the instance journal |
 | `/tits options` | settings |
 | `/tits link` | Wowhead link for your target |

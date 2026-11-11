@@ -50,6 +50,13 @@ function decode.item(raw)
              objectDrops = objects, startQuest = Num(f[10]) or 0, questRewards = Ids(f[11]) }
 end
 
+local function Pairs(s)
+    if not s or s == "" then return nil end
+    local out = {}
+    for a, b in s:gmatch("(%-?%d+):(%-?%d+)") do out[#out + 1] = { tonumber(a), tonumber(b) } end
+    return out
+end
+
 function decode.quest(raw)
     local f = Fields(raw)
     local function Wrap(ids)
@@ -61,7 +68,8 @@ function decode.quest(raw)
     return { name = f[1], questLevel = Num(f[2]) or 0, requiredLevel = Num(f[3]) or 0, requiredRaces = Num(f[4]) or 0,
              requiredClasses = Num(f[5]) or 0, objectivesText = f[6] ~= "" and { f[6] } or nil,
              startedBy = { Ids(f[7]), nil, Ids(f[8]) }, finishedBy = { Ids(f[9]) },
-             objectives = { Wrap(Ids(f[10])), nil, Wrap(Ids(f[11])) }, requiredSourceItems = Ids(f[12]) }
+             objectives = { Wrap(Ids(f[10])), nil, Wrap(Ids(f[11])) }, requiredSourceItems = Ids(f[12]),
+             reputationReward = Pairs(f[13]) }
 end
 
 -- Records are decoded when asked for. Only a few hundred stay decoded at a time, so walking the
@@ -112,6 +120,15 @@ function SB.Bundled()
         rawset(t, item, per)
         return per
     end })
+    -- quest -> { questLevel, xp }, parsed when first asked for
+    local questXP = setmetatable({}, { __index = function(t, quest)
+        local s = D.fqxp and D.fqxp[quest]
+        if not s then return nil end
+        local level, xp = s:match("^(%d+):(%d+)$")
+        local v = { tonumber(level), tonumber(xp) }
+        rawset(t, quest, v)
+        return v
+    end })
     local zoneDB = { instanceIdToAreaId = D.finstance or {}, names = D.fzoneName or {},
                      private = { areaIdToUiMapId = D.fuiMap or {}, dungeons = dungeons } }
 
@@ -126,6 +143,7 @@ function SB.Bundled()
         Support = { Get = function(name)
             if name == "ZoneDB" then return zoneDB end
             if name == "QuestieClassicItemDrops" then return { wowheadData = rates } end
+            if name == "QuestXP" then return { db = questXP } end
         end },
         info = D.finfo,
     }

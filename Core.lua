@@ -128,6 +128,13 @@ function SB.Money(copper)
     return table.concat(t, " ")
 end
 
+-- 12345 -> "12,345"
+function SB.Number(n)
+    n = math.floor(tonumber(n) or 0)
+    local s = tostring(math.abs(n)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return (n < 0 and "-" or "") .. s
+end
+
 function SB.Percent(chance)
     if not chance then return "?" end
     if chance <= 0 then return "0%" end
@@ -229,7 +236,7 @@ end
 local HELP = {
     "|cffffd100/tits|r - open the window on your target (or the last mob you viewed)",
     "|cffffd100/tits <name>|r - search mobs and items, e.g. |cffffd100/tits hogger|r",
-    "|cffffd100/tits zone|r - mobs in your zone or instance",
+    "|cffffd100/tits zone|r - mobs in your zone or instance; |cffffd100/tits zone westfall|r for another zone",
     "|cffffd100/tits dungeons|r, |cffffd100/tits raids|r - the instance journal",
     "|cffffd100/tits options|r - tooltip and window settings",
     "|cffffd100/tits link|r - Wowhead link for your target",
@@ -250,7 +257,7 @@ local function Slash(msg)
     elseif cmd == "options" or cmd == "settings" or cmd == "config" then
         SB.OpenSettings()
     elseif cmd == "zone" then
-        SB.OpenZone()
+        SB.OpenZone(rest)
     elseif cmd == "dungeons" or cmd == "dungeon" then
         SB.OpenDungeons(false)
     elseif cmd == "raids" or cmd == "raid" then

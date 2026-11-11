@@ -223,6 +223,37 @@ local function QuestDetails(rows, id)
         for _, item in ipairs(q and q.startItems or {}) do Add(ItemRow(item, nil, nil, "Starts the quest")) end
     end
 
+    -- rewards
+    local rw = SB.QuestRewards(id)
+    if #rw.choices + #rw.items + #rw.rep > 0 or rw.money or rw.xp then
+        Add(Header("Rewards"))
+        for _, e in ipairs(rw.choices) do
+            Add(ItemRow(e[1], e[2] > 1 and ("x" .. e[2]) or nil, nil, #rw.choices > 1 and "Choose one" or "You receive"))
+        end
+        for _, e in ipairs(rw.items) do
+            Add(ItemRow(e[1], e[2] > 1 and ("x" .. e[2]) or nil, nil, "You receive"))
+        end
+        if rw.xp then
+            local text
+            if not rw.xpYou then
+                text = SB.Number(rw.xp) .. " XP  |cffaaaaaa(none at max level)|r"
+            elseif rw.xpYou < rw.xp then
+                text = SB.Number(rw.xpYou) .. " XP  |cffaaaaaa(reduced from " .. SB.Number(rw.xp) .. " at your level)|r"
+            else
+                text = SB.Number(rw.xp) .. " XP"
+            end
+            Add(KV("Experience", text))
+        end
+        if rw.money then Add(KV("Money", SB.Money(rw.money))) end
+        if rw.moneyMax and not rw.xpYou and rw.xp then
+            Add(KV("At max level", SB.Money(rw.moneyMax) .. "  |cffaaaaaa(instead of experience)|r"))
+        end
+        for _, f in ipairs(rw.rep) do
+            local value = f[2] >= 0 and ("|cff40e040+" .. SB.Number(f[2]) .. "|r") or ("|cffff4040" .. SB.Number(f[2]) .. "|r")
+            Add(KV("Reputation", value .. "  " .. SB.FactionName(f[1])))
+        end
+    end
+
     local name = (q and q.name) or (active and active.title) or ("Quest " .. id)
     Add({ kind = "line", text = "Wowhead link", icon = "Interface\\Icons\\INV_Misc_Note_01",
           onClick = function() SB.ShowLink("quest", id, name) end })
@@ -310,12 +341,56 @@ local function ListRows()
             for _, id in ipairs(others) do rows[#rows + 1] = NpcRow(id, "boss") end
         end
         if #rows == 0 then rows[1] = Note(SB.index.ready and "No mobs known for this instance." or "Reading the database...") end
+    elseif mode == "zone" and state.zoneBrowse then
+        -- the zone directory
+        local zones = SB.ZoneDirectory()
+        title, count = "All zones", #zones
+        local _, here = SB.PlayerAreas()
+        rows[#rows + 1] = { kind = "line", icon = MAP_ICON, text = "Your zone: " .. (here or "?"), color = "header",
+                            onClick = function() state.zone, state.zoneName, state.zoneBrowse = nil, nil, false; DrawPage() end }
+        local continent
+        for _, z in ipairs(zones) do
+            if z.continent ~= continent then
+                continent = z.continent
+                rows[#rows + 1] = Header(continent)
+            end
+            local zone = z
+            rows[#rows + 1] = { kind = "line", icon = MAP_ICON, text = z.name,
+                                color = state.zone == z.area and "header" or nil,
+                                mid = z.minLevel and ("Levels " .. z.minLevel .. "-" .. z.maxLevel) or nil,
+                                right = SB.Plural(z.mobs, "mob"),
+                                onClick = function()
+                                    state.zone, state.zoneName, state.zoneBrowse = zone.area, zone.name, false
+                                    DrawPage()
+                                end }
+        end
+        if #zones == 0 then rows[#rows + 1] = Note(SB.index.ready and "No zones known." or "Reading the database...") end
     elseif mode == "zone" then
-        local areas, label = SB.PlayerAreas()
+        local areas, label
+        if state.zone then
+            areas, label = SB.AreasForZone(state.zone), state.zoneName or SB.ZoneName(state.zone)
+        else
+            areas, label = SB.PlayerAreas()
+        end
+        rows[#rows + 1] = { kind = "line", icon = MAP_ICON, text = "Browse all zones", color = "header",
+                            right = state.zone and "right-click: your zone" or nil,
+                            onClick = function(_, mouse)
+                                if mouse == "RightButton" and state.zone then
+                                    state.zone, state.zoneName = nil, nil
+                                else
+                                    state.zoneBrowse = true
+                                end
+                                DrawPage()
+                            end,
+                            tooltip = function(tt)
+                                tt:AddLine("Zones", 1, 1, 1)
+                                tt:AddLine("Click to pick any zone and see its mobs.", nil, nil, nil, true)
+                                if state.zone then tt:AddLine("Right-click to go back to the zone you're in.", nil, nil, nil, true) end
+                            end }
         local ids, have = {}, {}
         for _, id in ipairs(SB.NpcsInAreas(areas)) do have[id] = true; ids[#ids + 1] = id end
         -- plus every mob you've seen here, whether or not a database knows it
-        local here = GetZoneText and GetZoneText()
+        local here = not state.zone and GetZoneText and GetZoneText() or label
         for id, m in pairs(SB.db.mobs) do
             if not have[id] and m.z and (m.z == here or m.z == label) then have[id] = true; ids[#ids + 1] = id end
         end
@@ -344,11 +419,11 @@ local function ListRows()
                 for _, id in ipairs(grp[2]) do rows[#rows + 1] = NpcRow(id, "boss") end
             end
         end
-        if #rows == 0 then
+        if #rows == 1 then
             if not SB.QDB() then
-                rows[1] = Note("No mobs listed for " .. (label or "this zone") .. " yet. Type /tits status to see what's loaded.")
+                rows[2] = Note("No mobs listed for " .. (label or "this zone") .. " yet. Type /tits status to see what's loaded.")
             else
-                rows[1] = Note(SB.index.ready and "No mobs known for this zone." or "Reading the database...")
+                rows[2] = Note(SB.index.ready and "No mobs known for this zone." or "Reading the database...")
             end
         end
     elseif mode == "bestiary" then
@@ -915,34 +990,63 @@ end
 
 local NPC_TABS = {
     { key = "overview", tip = "Overview", off = "TabBossOff", on = "TabBossOn" },
-    { key = "loot", tip = "Loot", off = "TabLootOff", on = "TabLootOn" },
-    { key = "abilities", tip = "Abilities", off = "TabAbilitiesOff", on = "TabAbilitiesOn" },
+    { key = "loot", tip = "Loot", off = "TabLootOff", on = "TabLootOn", when = function(id)
+        local m = SB.db.mobs[id] or {}
+        local ex = SB.GetExtraLoot(id)
+        return #SB.GetLoot(id) > 0 or next(m.i or {}) ~= nil or next(m.g or {}) ~= nil or ex.skinning ~= nil or ex.pickpocket ~= nil
+    end },
+    { key = "abilities", tip = "Abilities", off = "TabAbilitiesOff", on = "TabAbilitiesOn", when = function(id)
+        local m = SB.db.mobs[id] or {}
+        return #SB.GetSpells(id) > 0 or next(m.s or {}) ~= nil
+    end },
     { key = "sells", tip = "Sells", icon = "Interface\\Icons\\INV_Misc_Bag_10", when = function(id) return #SB.Sells(id) > 0 end },
     { key = "teaches", tip = "Teaches", icon = "Interface\\Icons\\INV_Misc_Book_11", when = function(id) return #SB.Teaches(id) > 0 end },
-    { key = "model", tip = "Model", off = "TabModelOff", on = "TabModelOn" },
-    { key = "quests", tip = "Quests", icon = "Interface\\Icons\\INV_Misc_Book_08" },
+    { key = "model", tip = "Model", off = "TabModelOff", on = "TabModelOn", when = function(id)
+        local n = SB.GetNpc(id)
+        return (n and n.display or 0) > 0
+    end },
+    { key = "quests", tip = "Quests", icon = "Interface\\Icons\\INV_Misc_Book_08", when = function(id)
+        local n = SB.GetNpc(id)
+        local m = SB.db.mobs[id] or {}
+        return (n and (#n.starts > 0 or #n.ends > 0)) or #SB.KillFor(id) > 0 or next(m.q or {}) ~= nil
+            or #SB.QuestLog.ForNpc(id) > 0 or #SB.DropFor(id) > 0
+    end },
     { key = "notes", tip = "Your notes", icon = "Interface\\Icons\\INV_Misc_Note_01" },
 }
 
 local TABS = {
     item = {
         { key = "overview", tip = "Overview", off = "TabLootOff", on = "TabLootOn" },
-        { key = "droppedby", tip = "Dropped by", off = "TabBossOff", on = "TabBossOn" },
-        { key = "crafted", tip = "Crafted", icon = "Interface\\Icons\\Trade_BlackSmithing" },
-        { key = "quests", tip = "Quests", icon = "Interface\\Icons\\INV_Misc_Book_08" },
-        { key = "vendors", tip = "Sold by", icon = "Interface\\Icons\\INV_Misc_Coin_01" },
+        { key = "droppedby", tip = "Dropped by", off = "TabBossOff", on = "TabBossOn", when = function(id)
+            return SB.DropperCount(id) > 0 or #SB.YourItemSources(id) > 0
+        end },
+        { key = "crafted", tip = "Crafted", icon = "Interface\\Icons\\Trade_BlackSmithing", when = function(id)
+            return #SB.Crafting.ForItem(id) > 0
+        end },
+        { key = "quests", tip = "Quests", icon = "Interface\\Icons\\INV_Misc_Book_08", when = function(id)
+            local u = SB.GetItemUses(id)
+            return u.starts ~= nil or #u.objectiveOf > 0 or #u.rewardOf > 0 or #SB.QuestLog.ForItem(id) > 0
+        end },
+        { key = "vendors", tip = "Sold by", icon = "Interface\\Icons\\INV_Misc_Coin_01", when = function(id)
+            return SB.GetItemUses(id).vendorCount > 0
+        end },
     },
     instance = {
         { key = "overview", tip = "Overview", off = "TabBossOff", on = "TabBossOn" },
-        { key = "loot", tip = "Loot", off = "TabLootOff", on = "TabLootOn" },
+        { key = "loot", tip = "Loot", off = "TabLootOff", on = "TabLootOn", when = function(map)
+            local inst = SB.GetInstance(map)
+            for _, boss in ipairs(inst and inst.bosses or {}) do if #SB.GetLoot(boss) > 0 then return true end end
+            return false
+        end },
     },
 }
 
+-- The tabs a page has: those with nothing to show are left out.
 local function TabsFor(page)
     if not page then return {} end
-    if page.kind ~= "npc" then return TABS[page.kind] or {} end
+    local list = page.kind == "npc" and NPC_TABS or TABS[page.kind] or {}
     local out = {}
-    for _, t in ipairs(NPC_TABS) do
+    for _, t in ipairs(list) do
         if not t.when or t.when(page.id) then out[#out + 1] = t end
     end
     return out
@@ -1067,6 +1171,10 @@ local function Breadcrumb()
         parts[#parts + 1] = inst and inst.name or "?"
     else
         for _, t in ipairs(BOTTOM_TABS) do if t.key == mode then parts[#parts + 1] = t.label end end
+        if mode == "zone" then
+            if state.zoneBrowse then parts[#parts + 1] = "All zones"
+            elseif state.zoneName then parts[#parts + 1] = state.zoneName end
+        end
         if mode == "search" then parts[#parts + 1] = "Search: " .. (state.query or "") end
     end
     local p = state.page
@@ -1521,6 +1629,8 @@ local function CreateUI()
         else b:SetPoint("LEFT", ui.bottomTabs[i - 1], "RIGHT", btpl == "PanelTabButtonTemplate" and 3 or -14, 0) end
         b:SetScript("OnClick", function()
             if t.key == "settings" then SB.OpenSettings() return end
+            -- the Zone tab always starts at the zone you're in
+            if t.key == "zone" then state.zone, state.zoneName, state.zoneBrowse = nil, nil, false end
             state.mode = t.key
             ui.search:SetText("")
             ui.search:ClearFocus()
@@ -1646,10 +1756,19 @@ function SB.OpenTarget(fromButton)
     DrawPage()
 end
 
-function SB.OpenZone()
-    local map = SB.CurrentInstance()
-    if map then SB.OpenInstance(map) return end
+-- name: a zone to show (part of its name); nil = the zone you're in
+function SB.OpenZone(name)
     Ensure()
+    if name and name ~= "" then
+        local z = SB.FindZone(name)
+        if not z then SB.Print("no zone called \"" .. name .. "\". Try /tits zone and Browse all zones.") return end
+        state.zone, state.zoneName = z.area, z.name
+    else
+        local map = SB.CurrentInstance()
+        if map then SB.OpenInstance(map) return end
+        state.zone, state.zoneName = nil, nil
+    end
+    state.zoneBrowse = false
     state.mode = "zone"
     ui.search:SetText("")
     ui:Show()
@@ -1700,6 +1819,11 @@ function SB.CurrentPage() return state.page, state.tab end
 function SB.SetTab(tab) state.tab = tab; DrawPage(true) end
 function SB.SidebarRows() return ui and ui.leftList.rows end
 function SB.ContentRows() return ui and ui.content.rows end
+function SB.TabKeys()
+    local out = {}
+    for _, t in ipairs(TabsFor(state.page)) do out[#out + 1] = t.key end
+    return table.concat(out, ",")
+end
 function SB.GridRows() return ui and ui.gridList.rows end
 
 -- Re-skin after the style setting changes.
